@@ -1,0 +1,64 @@
+server:
+  port: 8090
+  shutdown: graceful
+
+spring:
+  application:
+    name: easy-bpm
+  profiles:
+    active: dev
+  threads:
+    virtual:
+      enabled: true
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema-mysql.sql
+  jackson:
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+    deserialization:
+      fail-on-unknown-properties: false
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: input
+
+# Flowable 8 流程引擎。schema 由引擎自动维护；生产环境建议改为 false 并用官方 SQL 初始化
+flowable:
+  database-schema-update: true
+  async-executor-activate: false
+  history-level: audit
+
+easybpm:
+  security:
+    jwt-secret: ${EASY_BPM_JWT_SECRET:easy-bpm-dev-secret-change-me-2026-11-09}
+    token-ttl-hours: ${EASY_BPM_TOKEN_TTL_HOURS:12}
+  demo:
+    enabled: ${EASY_BPM_DEMO_ENABLED:true}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+logging:
+  level:
+    root: info
+    com.easybpm: info
+    org.flowable: warn
