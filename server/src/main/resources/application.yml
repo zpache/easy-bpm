@@ -58,8 +58,4 @@ management:
     health:
       show-details: when_authorized
 
-logging:
-  level:
-    root: info
-    com.easybpm: info
-    org.flowable: warn
+# 日志框架与级别统一在 logback-spring.xml 管理（含 traceId、滚动归档、异步写入）
