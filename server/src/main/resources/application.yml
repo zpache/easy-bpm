@@ -6,7 +6,7 @@ spring:
   application:
     name: easy-bpm
   profiles:
-    active: dev
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   threads:
     virtual:
       enabled: true

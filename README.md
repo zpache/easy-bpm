@@ -44,15 +44,19 @@ easy-bpm/
 # 1. 建库
 mysql -uroot -p -e "CREATE DATABASE IF NOT EXISTS easy_bpm DEFAULT CHARSET utf8mb4"
 
-# 2. 启动（开发配置默认 localhost:3306 / root，密码通过环境变量提供）
+# 2. 本地启动（推荐）：使用 local 配置（不入库）
+#    先复制模板并填入本机数据库密码：
+cp server/src/main/resources/application-local.yml.example server/src/main/resources/application-local.yml
 cd server
+mvn spring-boot:run -Dspring-boot.run.profiles=local
+
+# 或使用 dev 配置（数据库密码通过环境变量提供）
 export EASY_BPM_DB_PASSWORD='你的数据库密码'
-export JAVA_HOME='<Java 25 安装目录>'   # 或确认 mvn 默认使用 JDK 25
 mvn spring-boot:run
 
 # 打包运行
 mvn -DskipTests package
-java -jar target/easy-bpm-server-1.0.0.jar
+java -jar target/easy-bpm-server-1.0.0.jar --spring.profiles.active=local
 ```
 
 启动后：
