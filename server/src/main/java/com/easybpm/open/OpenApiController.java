@@ -1,0 +1,143 @@
+package com.easybpm.open;
+
+import com.easybpm.common.ApiResponse;
+import com.easybpm.common.JsonCodec;
+import com.easybpm.common.PageResult;
+import com.easybpm.engine.ActionResult;
+import com.easybpm.engine.FlowEngineService;
+import com.easybpm.engine.InstanceDetail;
+import com.easybpm.engine.InstanceView;
+import com.easybpm.engine.StartCommand;
+import com.easybpm.engine.StartResult;
+import com.easybpm.engine.TaskView;
+import com.easybpm.engine.WorkbenchCounts;
+import com.easybpm.engine.WorkbenchQueryService;
+import com.easybpm.flow.FlowDefinition;
+import com.easybpm.flow.FlowDefinitionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+/**
+ * 对外开放接口。ERP / SaaS 只需要这一组接口即可完成审批闭环。
+ */
+@RestController
+@RequestMapping("/open/v1")
+@Tag(name = "OpenAPI", description = "第三方系统接入的审批接口")
+public class OpenApiController {
+
+    private final FlowEngineService engine;
+    private final WorkbenchQueryService query;
+    private final FlowDefinitionService definitions;
+    private final JsonCodec json;
+
+    public OpenApiController(FlowEngineService engine, WorkbenchQueryService query,
+                             FlowDefinitionService definitions, JsonCodec json) {
+        this.engine = engine;
+        this.query = query;
+        this.definitions = definitions;
+        this.json = json;
+    }
+
+    @GetMapping("/flows")
+    @Operation(summary = "查询当前租户已发布的审批流程")
+    public ApiResponse<List<FlowSummary>> flows() {
+        return ApiResponse.ok(definitions.listPublished().stream().map(this::toSummary).toList());
+    }
+
+    @PostMapping("/instances")
+    @Operation(summary = "创建并提交审批", description = "一次调用完成发起；返回实例ID与当前待办任务")
+    public ApiResponse<StartResult> start(@Valid @RequestBody OpenDtos.StartRequest request) {
+        StartCommand command = new StartCommand(request.flowCode(), request.businessKey(), request.title(),
+                request.initiatorId(), request.initiatorName(), request.initiatorDeptCode(),
+                request.formData(), request.ccUsers(), request.callbackUrl(), request.idempotencyKey());
+        return ApiResponse.ok(engine.start(command));
+    }
+
+    @GetMapping("/instances/{instanceId}")
+    @Operation(summary = "查询审批详情与时间线")
+    public ApiResponse<InstanceDetail> detail(@PathVariable String instanceId) {
+        return ApiResponse.ok(query.detail(instanceId));
+    }
+
+    @GetMapping("/instances/submitted")
+    @Operation(summary = "查询我提交的审批")
+    public ApiResponse<PageResult<InstanceView>> submitted(
+            @RequestParam String userId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String flowCode,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword) {
+        return ApiResponse.ok(query.submitted(userId, page(page), size(size), flowCode, status, keyword));
+    }
+
+    @GetMapping("/tasks/todo")
+    @Operation(summary = "查询待办任务")
+    public ApiResponse<PageResult<TaskView>> todo(
+            @RequestParam String userId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String flowCode,
+            @RequestParam(required = false) String keyword) {
+        return ApiResponse.ok(query.todo(userId, page(page), size(size), flowCode, keyword));
+    }
+
+    @GetMapping("/tasks/done")
+    @Operation(summary = "查询已办任务")
+    public ApiResponse<PageResult<TaskView>> done(
+            @RequestParam String userId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String flowCode,
+            @RequestParam(required = false) String keyword) {
+        return ApiResponse.ok(query.done(userId, page(page), size(size), flowCode, keyword));
+    }
+
+    @GetMapping("/tasks/count")
+    @Operation(summary = "查询待办/已办/已提交数量")
+    public ApiResponse<WorkbenchCounts> counts(@RequestParam String userId) {
+        return ApiResponse.ok(query.counts(userId));
+    }
+
+    @PostMapping("/tasks/{taskId}/approve")
+    @Operation(summary = "同意", description = "会签节点需全部同意；或签节点一人同意即流转")
+    public ApiResponse<ActionResult> approve(@PathVariable String taskId,
+                                             @Valid @RequestBody OpenDtos.HandleRequest request) {
+        return ApiResponse.ok(engine.approve(taskId, request.userId(), request.comment(), request.formData()));
+    }
+
+    @PostMapping("/tasks/{taskId}/reject")
+    @Operation(summary = "驳回", description = "驳回后实例结束，状态为 REJECTED")
+    public ApiResponse<ActionResult> reject(@PathVariable String taskId,
+                                            @Valid @RequestBody OpenDtos.HandleRequest request) {
+        return ApiResponse.ok(engine.reject(taskId, request.userId(), request.comment()));
+    }
+
+    private FlowSummary toSummary(FlowDefinition definition) {
+        Object formSchema = definition.getFormSchema() == null ? null : json.readMap(definition.getFormSchema());
+        return new FlowSummary(definition.getCode(), definition.getName(), definition.getCategory(),
+                definition.getDescription(), definition.getVersion(), formSchema);
+    }
+
+    private int page(int page) {
+        return Math.max(page, 1);
+    }
+
+    private int size(int size) {
+        return Math.min(Math.max(size, 1), 100);
+    }
+
+    public record FlowSummary(String code, String name, String category, String description,
+                              Integer version, Object formSchema) {
+    }
+}

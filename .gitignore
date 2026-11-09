@@ -1,0 +1,23 @@
+# Java
+server/target/
+*.class
+*.jar
+*.original
+
+# Node
+console/node_modules/
+console/dist/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS / logs
+.DS_Store
+*.log
+logs/
+
+# 本地环境变量
+.env
+.env.local
