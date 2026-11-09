@@ -55,11 +55,11 @@
         </encoder>
     </appender>
 
-    <!-- 异步包装：文件写入不阻塞业务线程；队列满时阻塞写入方，保证 BPM 审计日志不丢 -->
+    <!-- 异步包装：文件写入不阻塞业务线程；稳定性优先，队列满时丢弃日志（可选 ERROR 永不丢） -->
     <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
         <queueSize>1024</queueSize>
         <discardingThreshold>0</discardingThreshold>
-        <neverBlock>false</neverBlock>
+        <neverBlock>true</neverBlock>
         <includeCallerData>false</includeCallerData>
         <appender-ref ref="FILE"/>
     </appender>
@@ -67,7 +67,7 @@
     <appender name="ASYNC_ERROR_FILE" class="ch.qos.logback.classic.AsyncAppender">
         <queueSize>256</queueSize>
         <discardingThreshold>0</discardingThreshold>
-        <neverBlock>false</neverBlock>
+        <neverBlock>true</neverBlock>
         <appender-ref ref="ERROR_FILE"/>
     </appender>
 
