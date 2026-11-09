@@ -190,9 +190,6 @@ public class BpmnCompiler {
                 // INITIATOR_LEADER / DEPT_LEADER / SELF 无需额外配置
             }
         }
-        if (props.rejectOrDefault() == RejectStrategy.TO_START) {
-            throw invalid("P1 暂只支持驳回到结束（TO_END），TO_START 将在 P2 提供");
-        }
     }
 
     private void validateExpression(FlowNode node) {

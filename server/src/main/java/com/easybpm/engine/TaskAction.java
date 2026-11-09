@@ -1,5 +1,5 @@
 package com.easybpm.engine;
 
 public enum TaskAction {
-    SUBMIT, APPROVE, REJECT, TRANSFER, REVOKE, CC, AUTO_PASS
+    SUBMIT, APPROVE, REJECT, TRANSFER, REVOKE, RESUBMIT, CC, AUTO_PASS
 }

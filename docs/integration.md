@@ -187,9 +187,66 @@ POST /open/v1/tasks/{taskId}/reject
 { "userId": "u1002", "comment": "发票不合规" }
 ```
 
-P1 驳回后实例直接结束，状态 `REJECTED`，`currentNodeName` 保留驳回节点。P2 将支持「驳回到发起人后重新提交」。
+按节点配置的 `rejectStrategy` 生效：
 
-### 3.6 详情与时间线
+- `TO_END`（默认）：实例直接结束，状态 `REJECTED`，`currentNodeName` 保留驳回节点；
+- `TO_START`：退回发起人，实例保持 `RUNNING`、`currentNodeName` 为 `等待发起人重新提交`，
+  发起人调用重新提交接口（见 3.7）后从头流转。
+
+### 3.6 重新提交（TO_START 驳回后）
+
+```
+POST /open/v1/instances/{instanceId}/resubmit
+```
+
+```json
+{ "userId": "u1001", "formData": { "days": 5, "reason": "补全信息" }, "comment": "已修改" }
+```
+
+- 仅发起人可调用，且实例必须处于 `等待发起人重新提交` 状态；
+- `formData` 与原表单合并，审批人与条件按最新表单重新解析；
+- 时间线记录 `RESUBMIT`。
+
+### 3.7 撤回与转交
+
+```
+POST /open/v1/instances/{instanceId}/withdraw    # 发起人撤回
+POST /open/v1/tasks/{taskId}/transfer            # 处理人转交
+```
+
+```json
+{ "userId": "u1001", "comment": "填错了" }
+{ "userId": "u1002", "targetUserId": "u1003", "comment": "出差，请代处理" }
+```
+
+- 撤回：仅发起人、仅 `RUNNING` 状态，撤回后实例 `CANCELED`；
+- 转交：仅当前处理人可转，目标必须是同租户在职人员，时间线记录 `TRANSFER`。
+
+### 3.8 组织同步
+
+```
+POST /open/v1/org/sync
+```
+
+```json
+{
+  "users": [
+    { "userCode": "u1001", "name": "张三", "deptCode": "D-SALES", "leaderCode": "u1002", "title": "销售", "status": "ACTIVE" },
+    { "userCode": "u1009", "name": "离职员工", "status": "DISABLED" }
+  ],
+  "depts": [
+    { "deptCode": "D-SALES", "name": "销售部", "parentCode": "D-HQ", "leaderId": "u1002" }
+  ],
+  "roles": [
+    { "userCode": "u1003", "roleCodes": ["FINANCE"] }
+  ]
+}
+```
+
+- 全部按编码幂等 upsert；`users[].status` 支持 `ACTIVE / DISABLED`（离职置 DISABLED 即不可再被解析为审批人）；
+- `roles` 为全量替换该人员的角色列表；不传对应段落则跳过。
+
+### 3.9 详情与时间线
 
 ```
 GET /open/v1/instances/{instanceId}

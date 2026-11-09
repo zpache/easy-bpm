@@ -88,7 +88,11 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | GET | `/tasks/done?userId=` | 已办 |
 | GET | `/tasks/count?userId=` | 三种状态数量 |
 | POST | `/tasks/{taskId}/approve` | 同意 |
-| POST | `/tasks/{taskId}/reject` | 驳回 |
+| POST | `/tasks/{taskId}/reject` | 驳回（TO_END 结束 / TO_START 退回发起人） |
+| POST | `/tasks/{taskId}/transfer` | 转交给其他在职人员 |
+| POST | `/instances/{instanceId}/resubmit` | TO_START 驳回后重新提交 |
+| POST | `/instances/{instanceId}/withdraw` | 发起人撤回（CANCELED） |
+| POST | `/org/sync` | 组织同步（人员/部门/角色批量 upsert） |
 
 控制台（`/api`，Bearer Token）：
 
@@ -151,7 +155,7 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 |---|---|---|
 | P0 | Flowable 8 + Boot 4.1.2 + Java 25 技术验证 | ✅ |
 | P1 | 多租户鉴权 + 流程发布 + 发起/待办/同意/驳回纵切 | ✅ |
-| P2 | 驳回到发起人（TO_START）、撤回、转交、加签、组织同步接口、完整时间线 | 待做 |
+| P2 | 驳回到发起人（TO_START）、撤回、转交、重提、组织同步接口、索引与幂等顺序修复 | ✅ |
 | P3 | 流程定义可视化编辑、版本回滚、表单设计器 | 待做 |
 | P4 | Webhook 回调 + 重试、幂等强化、限流、审计日志 | 待做 |
 | P5 | Vue3 控制台（工作台/审批详情/设计器/组织/租户凭证） | 待做 |
@@ -162,4 +166,4 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 - **H2 不能使用 `MODE=MySQL`**：Flowable 会据此选择 MySQL 方言，`IDENTITY` 建表语句在 H2 下报错。开发用 MySQL，测试用 H2 原生模式。
 - Flowable 引擎表（`ACT_*`）与业务表同库，生产环境建议 `flowable.database-schema-update=false`，用官方脚本初始化。
 - 生产必须替换 `EASY_BPM_JWT_SECRET`，并通过环境变量提供数据库账号密码。
-- 当前 P1 的驳回策略只支持 `TO_END`；`TO_START` 在 P2 提供。
+- 当前驳回策略支持 `TO_END`（直接结束）与 `TO_START`（退回发起人，重提后重新流转）。
