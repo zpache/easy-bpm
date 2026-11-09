@@ -11,6 +11,7 @@ import com.easybpm.flow.FlowDefinition;
 import com.easybpm.flow.FlowDefinitionService;
 import com.easybpm.flow.FlowNode;
 import com.easybpm.flow.FlowSchema;
+import com.easybpm.flow.FormValidator;
 import com.easybpm.flow.NodeType;
 import com.easybpm.flow.RejectStrategy;
 import com.easybpm.org.OrgService;
@@ -55,6 +56,7 @@ public class FlowEngineService {
     private final FlowDefinitionService definitions;
     private final BpmnCompiler compiler;
     private final JsonCodec json;
+    private final FormValidator formValidator;
     private final ApproverResolver approverResolver;
     private final ConditionEvaluator conditionEvaluator;
     private final OrgService orgService;
@@ -65,13 +67,15 @@ public class FlowEngineService {
     private final BpmTaskRecordMapper recordMapper;
 
     public FlowEngineService(FlowDefinitionService definitions, BpmnCompiler compiler, JsonCodec json,
-                             ApproverResolver approverResolver, ConditionEvaluator conditionEvaluator,
+                             FormValidator formValidator, ApproverResolver approverResolver,
+                             ConditionEvaluator conditionEvaluator,
                              OrgService orgService, RuntimeService runtimeService, TaskService taskService,
                              HistoryService historyService, BpmInstanceMapper instanceMapper,
                              BpmTaskRecordMapper recordMapper) {
         this.definitions = definitions;
         this.compiler = compiler;
         this.json = json;
+        this.formValidator = formValidator;
         this.approverResolver = approverResolver;
         this.conditionEvaluator = conditionEvaluator;
         this.orgService = orgService;
@@ -108,6 +112,7 @@ public class FlowEngineService {
 
         FlowDefinition definition = definitions.requirePublished(command.flowCode());
         FlowSchema schema = json.read(definition.getFlowSchema(), FlowSchema.class);
+        formValidator.validate(definition.getFormSchema(), command.formData());
         String title = command.title() == null || command.title().isBlank()
                 ? definition.getName() + " - " + command.initiatorName()
                 : command.title();
@@ -170,6 +175,7 @@ public class FlowEngineService {
 
         FlowDefinition definition = definitions.requirePublished(projection.getFlowCode());
         FlowSchema schema = json.read(definition.getFlowSchema(), FlowSchema.class);
+        formValidator.validate(definition.getFormSchema(), formData);
 
         Map<String, Object> merged = new LinkedHashMap<>(json.readMap(projection.getFormData()));
         if (formData != null) {
