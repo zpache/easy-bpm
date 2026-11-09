@@ -1,5 +1,6 @@
 package com.easybpm.engine;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.easybpm.common.Ids;
 import com.easybpm.org.OrgService;
 import com.easybpm.tenant.TenantContext;
@@ -20,18 +21,20 @@ public class CcDelegate implements JavaDelegate {
 
     private final BpmCcMapper ccMapper;
     private final BpmTaskRecordMapper recordMapper;
+    private final BpmInstanceMapper instanceMapper;
     private final OrgService orgService;
 
-    public CcDelegate(BpmCcMapper ccMapper, BpmTaskRecordMapper recordMapper, OrgService orgService) {
+    public CcDelegate(BpmCcMapper ccMapper, BpmTaskRecordMapper recordMapper,
+                      BpmInstanceMapper instanceMapper, OrgService orgService) {
         this.ccMapper = ccMapper;
         this.recordMapper = recordMapper;
+        this.instanceMapper = instanceMapper;
         this.orgService = orgService;
     }
 
     @Override
     public void execute(DelegateExecution execution) {
         String tenantId = execution.getTenantId();
-        String instanceId = execution.getProcessInstanceId();
         String nodeId = execution.getCurrentActivityId();
         String nodeName = execution.getCurrentFlowElement() == null ? nodeId : execution.getCurrentFlowElement().getName();
         Object raw = execution.getVariable("cc_" + nodeId);
@@ -42,11 +45,15 @@ public class CcDelegate implements JavaDelegate {
         Map<String, String> names = orgService.namesOf(userIds);
 
         TenantContext.callAs(tenantId, () -> {
+            // 抄送记录归属对外实例 ID（TO_START 重提后引擎实例 ID 会更换）
+            String externalId = instanceMapper.selectOne(new LambdaQueryWrapper<BpmInstance>()
+                            .eq(BpmInstance::getEngineInstanceId, execution.getProcessInstanceId()))
+                    .getInstanceId();
             LocalDateTime now = LocalDateTime.now();
             for (String userId : userIds) {
                 BpmCc cc = new BpmCc();
                 cc.setId(Ids.id());
-                cc.setInstanceId(instanceId);
+                cc.setInstanceId(externalId);
                 cc.setNodeId(nodeId);
                 cc.setNodeName(nodeName);
                 cc.setUserId(userId);
@@ -57,7 +64,7 @@ public class CcDelegate implements JavaDelegate {
             }
             BpmTaskRecord record = new BpmTaskRecord();
             record.setId(Ids.id());
-            record.setInstanceId(instanceId);
+            record.setInstanceId(externalId);
             record.setNodeId(nodeId);
             record.setNodeName(nodeName);
             record.setOperatorId("system");
