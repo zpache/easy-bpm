@@ -70,6 +70,22 @@ public class ConsoleFlowController {
         return ApiResponse.ok();
     }
 
+    @org.springframework.web.bind.annotation.DeleteMapping("/{code}")
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable String code) {
+        requireAdmin();
+        definitions.deleteDraft(code, CurrentUser.requireApproverId());
+    }
+
+    @PostMapping("/{code}/versions/{version}/rollback")
+    public ApiResponse<FlowView> rollback(@PathVariable String code, @PathVariable int version,
+                                          @RequestBody(required = false) PublishRequest request) {
+        requireAdmin();
+        String changelog = request == null ? null : request.changelog();
+        return ApiResponse.ok(toView(definitions.rollback(code, version,
+                CurrentUser.requireApproverId(), changelog)));
+    }
+
     @GetMapping("/{code}/versions")
     public ApiResponse<List<VersionView>> versions(@PathVariable String code) {
         return ApiResponse.ok(definitions.versions(code).stream().map(this::toVersionView).toList());

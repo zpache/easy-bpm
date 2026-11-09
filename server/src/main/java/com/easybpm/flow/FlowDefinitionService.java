@@ -173,6 +173,47 @@ public class FlowDefinitionService {
         definitionMapper.updateById(definition);
     }
 
+    /**
+     * 删除从未发布过的草稿定义。已发布（含停用）的定义不可删除，保证历史实例可追溯。
+     */
+    @Transactional
+    public void deleteDraft(String code, String operator) {
+        FlowDefinition definition = require(code);
+        if (definition.getVersion() != null && definition.getVersion() > 0) {
+            throw BizException.badRequest("已发布过的流程不可删除（code=" + code + "），请使用停用");
+        }
+        definitionMapper.deleteById(definition.getId());
+        versionMapper.delete(new LambdaQueryWrapper<FlowVersion>()
+                .eq(FlowVersion::getDefinitionId, definition.getId()));
+    }
+
+    /**
+     * 版本回滚：取历史版本的审批链/表单覆盖当前定义，并立即发布为新版本（N+1），
+     * 引擎部署与版本快照同步推进，历史版本永不丢失。
+     */
+    @Transactional
+    public FlowDefinition rollback(String code, int targetVersion, String operator, String changelog) {
+        FlowDefinition definition = require(code);
+        FlowVersion target = versionMapper.selectOne(new LambdaQueryWrapper<FlowVersion>()
+                .eq(FlowVersion::getDefinitionId, definition.getId())
+                .eq(FlowVersion::getVersion, targetVersion));
+        if (target == null) {
+            throw BizException.badRequest("目标版本不存在：v" + targetVersion);
+        }
+        if (targetVersion == definition.getVersion()) {
+            throw BizException.badRequest("目标版本已是当前版本：v" + targetVersion);
+        }
+
+        definition.setFlowSchema(target.getFlowSchema());
+        definition.setFormSchema(target.getFormSchema());
+        definition.setStatus("DRAFT");
+        definition.setUpdatedBy(operator);
+        definition.setUpdatedAt(LocalDateTime.now());
+        definitionMapper.updateById(definition);
+        return publish(code, operator,
+                (changelog == null || changelog.isBlank() ? "回滚到 v" + targetVersion : changelog));
+    }
+
     public List<FlowVersion> versions(String code) {
         FlowDefinition definition = require(code);
         return versionMapper.selectList(new LambdaQueryWrapper<FlowVersion>()

@@ -103,7 +103,9 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | GET/POST | `/flows` | 流程定义列表 / 保存 |
 | POST | `/flows/{code}/publish` | 发布（编译 BPMN 并部署） |
 | POST | `/flows/{code}/disable` | 停用 |
+| DELETE | `/flows/{code}` | 删除从未发布过的草稿 |
 | GET | `/flows/{code}/versions` | 版本列表 |
+| POST | `/flows/{code}/versions/{version}/rollback` | 回滚到历史版本（立即发布为新版本） |
 | GET | `/workbench/todo\|done\|submitted` | 工作台三种列表 |
 | GET | `/workbench/counts` | 待办/已办/已提交数量 |
 | POST | `/workbench/tasks/{taskId}/approve\|reject` | 控制台审批（身份取登录账号绑定人员） |
@@ -147,7 +149,8 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 
 - Flowable 负责状态机；`bpm_instance` 是实例投影，承担列表检索、标题/业务主键映射与统计，避免复杂 join。
 - `bpm_task_record` 是审计时间线，与引擎数据解耦，便于合规留痕。
-- 审批链版本存 `bpm_flow_version`，发布即新版本，运行中实例不受影响。
+- 审批链版本存 `bpm_flow_version`，发布即新版本，运行中实例不受影响；回滚 = 取历史版本内容覆盖后发布为 N+1 新版本。
+- 实例对外 ID 恒定：`bpm_instance.instance_id` 创建后不变；`engine_instance_id` 记录当前引擎实例，TO_START 重提时更换。
 
 ## 阶段计划
 
@@ -156,7 +159,8 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | P0 | Flowable 8 + Boot 4.1.2 + Java 25 技术验证 | ✅ |
 | P1 | 多租户鉴权 + 流程发布 + 发起/待办/同意/驳回纵切 | ✅ |
 | P2 | 驳回到发起人（TO_START）、撤回、转交、重提、组织同步接口、索引与幂等顺序修复 | ✅ |
-| P3 | 流程定义可视化编辑、版本回滚、表单设计器 | 待做 |
+| P3 后端 | 版本回滚、草稿删除、表单 schema 校验（required/type） | ✅ 后端 |
+| P3 | 流程定义可视化编辑、表单设计器 | 待做（前端） |
 | P4 | Webhook 回调 + 重试、幂等强化、限流、审计日志 | 待做 |
 | P5 | Vue3 控制台（工作台/审批详情/设计器/组织/租户凭证） | 待做 |
 | P6 | Docker Compose、MySQL 初始化脚本、部署与运维文档 | 待做 |
