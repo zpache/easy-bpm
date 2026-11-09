@@ -18,7 +18,3 @@ flowable:
 easybpm:
   demo:
     enabled: false
-
-logging:
-  level:
-    com.easybpm: info
