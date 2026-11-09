@@ -6,7 +6,8 @@ spring:
   application:
     name: easy-bpm
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
+    # local 存放本机私有配置（数据库密码等），已被 gitignore，缺失时不影响启动
+    active: ${SPRING_PROFILES_ACTIVE:dev,local}
   threads:
     virtual:
       enabled: true
