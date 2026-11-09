@@ -12,6 +12,7 @@ import com.easybpm.flow.FlowDefinitionService;
 import com.easybpm.flow.FlowNode;
 import com.easybpm.flow.FlowSchema;
 import com.easybpm.flow.NodeType;
+import com.easybpm.flow.RejectStrategy;
 import com.easybpm.org.OrgService;
 import com.easybpm.org.OrgUser;
 import com.easybpm.tenant.TenantContext;
@@ -40,9 +41,16 @@ import java.util.Objects;
  *
  * <p>所有 Flowable 调用都显式带 tenantId，业务代码无法跨租户操作流程实例；
  * 审批链的高级能力（或签/会签、条件节点、抄送）通过编译后的 BPMN 生效。
+ *
+ * <p>P2 新增：驳回策略 TO_START（退回发起人重提）、发起人撤回、任务转交。
+ * TO_START 的实现采用「终止旧引擎实例 + 重提时重建新实例」的方式，
+ * 对外 identity 恒定为投影 instanceId，接入方无感知。
  */
 @Service
 public class FlowEngineService {
+
+    /** TO_START 驳回后实例停留在等待重提状态的展示名。 */
+    public static final String PENDING_RESUBMIT_NODE = "等待发起人重新提交";
 
     private final FlowDefinitionService definitions;
     private final BpmnCompiler compiler;
@@ -77,11 +85,8 @@ public class FlowEngineService {
     @Transactional
     public StartResult start(StartCommand command) {
         String tenantId = TenantContext.require();
-        if (command.initiatorId() == null || command.initiatorId().isBlank()) {
-            throw BizException.badRequest("initiatorId 不能为空");
-        }
 
-        FlowDefinition definition = definitions.requirePublished(command.flowCode());
+        // 幂等检查必须先于参数校验：重发请求即使缺字段也应返回原实例
         if (command.idempotencyKey() != null && !command.idempotencyKey().isBlank()) {
             BpmInstance existing = instanceMapper.selectOne(new LambdaQueryWrapper<BpmInstance>()
                     .eq(BpmInstance::getIdempotencyKey, command.idempotencyKey()));
@@ -91,35 +96,23 @@ public class FlowEngineService {
             }
         }
 
+        if (command.flowCode() == null || command.flowCode().isBlank()) {
+            throw BizException.badRequest("flowCode 不能为空");
+        }
+        if (command.initiatorId() == null || command.initiatorId().isBlank()) {
+            throw BizException.badRequest("initiatorId 不能为空");
+        }
+        if (command.initiatorName() == null || command.initiatorName().isBlank()) {
+            throw BizException.badRequest("initiatorName 不能为空");
+        }
+
+        FlowDefinition definition = definitions.requirePublished(command.flowCode());
         FlowSchema schema = json.read(definition.getFlowSchema(), FlowSchema.class);
         String title = command.title() == null || command.title().isBlank()
                 ? definition.getName() + " - " + command.initiatorName()
                 : command.title();
 
-        Map<String, Object> variables = new LinkedHashMap<>(command.formData());
-        variables.put("initiatorId", command.initiatorId());
-        variables.put("initiatorName", command.initiatorName());
-        if (command.initiatorDeptCode() != null) {
-            variables.put("initiatorDeptCode", command.initiatorDeptCode());
-        }
-        variables.put("instanceTitle", title);
-
-        List<FlowNode> nodes = schema.nodes().subList(1, schema.nodes().size() - 1);
-        for (FlowNode node : nodes) {
-            if (node.condition() != null && !node.condition().isBlank()) {
-                variables.put("cond_" + node.id(), conditionEvaluator.evaluate(node.condition(), variables, node.name()));
-            }
-            if (node.type() == NodeType.APPROVAL) {
-                List<String> approvers = approverResolver.resolve(node, command, variables);
-                approverResolver.requireNotEmpty(approvers, node);
-                variables.put("ap_" + node.id(), approvers);
-                variables.put("decision_" + node.id(), "PENDING");
-            } else if (node.type() == NodeType.CC) {
-                List<String> ccUsers = new ArrayList<>(node.props().ccUsers());
-                ccUsers.addAll(command.ccUsers());
-                variables.put("cc_" + node.id(), new ArrayList<>(new LinkedHashSet<>(ccUsers)));
-            }
-        }
+        Map<String, Object> variables = resolveVariables(definition, schema, command, title);
 
         ProcessInstance processInstance;
         try {
@@ -149,19 +142,92 @@ public class FlowEngineService {
         projection.setUpdatedAt(now);
         instanceMapper.insert(projection);
 
-        insertRecord(processInstance.getId(), null, "start", "发起审批", command.initiatorId(),
+        insertRecord(processInstance.getId(), null, null, "发起审批", command.initiatorId(),
                 command.initiatorName(), TaskAction.SUBMIT, null);
 
         ActionResult current = syncProgress(processInstance.getId(), false);
-        projection.setStatus(current.status());
-        projection.setCurrentNodeName(current.currentNodeName());
-        if (!InstanceStatus.RUNNING.name().equals(current.status())) {
-            projection.setEndedAt(LocalDateTime.now());
+        return new StartResult(processInstance.getId(), current.status(),
+                current.currentNodeName(), pendingTasks(processInstance.getId()));
+    }
+
+    /**
+     * 发起人重新提交（配合 TO_START 驳回）：以最新表单重新解析审批人/条件，重建引擎实例。
+     */
+    @Transactional
+    public StartResult resubmit(String instanceId, String userId, Map<String, Object> formData, String comment) {
+        BpmInstance projection = requireProjection(instanceId);
+        if (!InstanceStatus.RUNNING.name().equals(projection.getStatus())) {
+            throw new BizException(ErrorCode.INSTANCE_NOT_RUNNING);
         }
+        if (!PENDING_RESUBMIT_NODE.equals(projection.getCurrentNodeName())) {
+            throw BizException.badRequest("当前不在等待重新提交状态，无法重提");
+        }
+        if (!Objects.equals(projection.getInitiatorId(), userId)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "只有发起人可以重新提交");
+        }
+
+        FlowDefinition definition = definitions.requirePublished(projection.getFlowCode());
+        FlowSchema schema = json.read(definition.getFlowSchema(), FlowSchema.class);
+
+        Map<String, Object> merged = new LinkedHashMap<>(json.readMap(projection.getFormData()));
+        if (formData != null) {
+            merged.putAll(formData);
+        }
+        StartCommand command = new StartCommand(definition.getCode(), projection.getBusinessKey(),
+                projection.getTitle(), projection.getInitiatorId(), projection.getInitiatorName(),
+                projection.getInitiatorDeptCode(), merged, List.of(), projection.getCallbackUrl(), null);
+        String title = projection.getTitle();
+        Map<String, Object> variables = resolveVariables(definition, schema, command, title);
+
+        ProcessInstance newProcess;
+        try {
+            newProcess = runtimeService.startProcessInstanceByKeyAndTenantId(
+                    compiler.processKeyOf(definition.getCode()), projection.getBusinessKey(), variables,
+                    TenantContext.require());
+        } catch (FlowableObjectNotFoundException e) {
+            throw new BizException(ErrorCode.FLOW_NOT_FOUND, "流程未部署或已停用：" + definition.getCode());
+        }
+
+        projection.setInstanceId(newProcess.getId());
+        projection.setFormData(json.write(merged));
+        projection.setUpdatedAt(LocalDateTime.now());
         instanceMapper.updateById(projection);
 
-        return new StartResult(processInstance.getId(), projection.getStatus(),
-                projection.getCurrentNodeName(), pendingTasks(processInstance.getId()));
+        insertRecord(newProcess.getId(), null, null, "重新提交", userId,
+                displayName(userId), TaskAction.RESUBMIT, comment);
+
+        ActionResult current = syncProgress(newProcess.getId(), false);
+        return new StartResult(newProcess.getId(), current.status(),
+                current.currentNodeName(), pendingTasks(newProcess.getId()));
+    }
+
+    /**
+     * 发起人撤回运行中的实例：终止引擎流程，投影标记 CANCELED。
+     */
+    @Transactional
+    public ActionResult withdraw(String instanceId, String userId, String comment) {
+        BpmInstance projection = requireProjection(instanceId);
+        if (!InstanceStatus.RUNNING.name().equals(projection.getStatus())) {
+            throw new BizException(ErrorCode.INSTANCE_NOT_RUNNING, "仅运行中的审批可以撤回");
+        }
+        if (!Objects.equals(projection.getInitiatorId(), userId)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "只有发起人可以撤回");
+        }
+
+        terminateQuietly(projection.getInstanceId(), "WITHDRAW:" + userId);
+
+        LocalDateTime now = LocalDateTime.now();
+        projection.setStatus(InstanceStatus.CANCELED.name());
+        projection.setCurrentNodeName("发起人撤回");
+        projection.setEndedAt(now);
+        projection.setUpdatedAt(now);
+        instanceMapper.updateById(projection);
+
+        insertRecord(projection.getInstanceId(), null, null, "撤回", userId,
+                displayName(userId), TaskAction.REVOKE, comment);
+
+        return new ActionResult(projection.getInstanceId(), projection.getStatus(),
+                projection.getCurrentNodeName(), now);
     }
 
     @Transactional
@@ -188,6 +254,11 @@ public class FlowEngineService {
         Task task = requireActiveTask(taskId, userId);
         String processInstanceId = task.getProcessInstanceId();
         String nodeId = task.getTaskDefinitionKey();
+        RejectStrategy strategy = rejectStrategyOf(processInstanceId, nodeId);
+
+        if (strategy == RejectStrategy.TO_START) {
+            return rejectToStart(task, userId, comment);
+        }
 
         runtimeService.setVariable(processInstanceId, "decision_" + nodeId, "REJECT");
         addComment(taskId, processInstanceId, comment);
@@ -196,6 +267,116 @@ public class FlowEngineService {
                 displayName(userId), TaskAction.REJECT, comment);
 
         return syncProgress(processInstanceId, true);
+    }
+
+    /**
+     * 转交：将任务转给同租户其他在职人员，原处理人立即失去处理权。
+     */
+    @Transactional
+    public ActionResult transfer(String taskId, String userId, String targetUserId, String comment) {
+        Task task = requireActiveTask(taskId, userId);
+        if (Objects.equals(task.getAssignee(), targetUserId)) {
+            throw BizException.badRequest("不能转交给自己");
+        }
+        OrgUser target = orgService.findUser(targetUserId);
+        if (target == null) {
+            throw BizException.badRequest("目标处理人不存在：" + targetUserId);
+        }
+        if (!"ACTIVE".equals(target.getStatus())) {
+            throw BizException.badRequest("目标处理人已停用：" + targetUserId);
+        }
+
+        String processInstanceId = task.getProcessInstanceId();
+        taskService.setAssignee(taskId, targetUserId);
+        String note = (comment == null || comment.isBlank() ? "" : comment + "；")
+                + "转交给 " + target.getName();
+        insertRecord(processInstanceId, taskId, task.getTaskDefinitionKey(), task.getName(), userId,
+                displayName(userId), TaskAction.TRANSFER, note);
+
+        return syncProgress(processInstanceId, false);
+    }
+
+    /** TO_START：终止当前引擎实例，实例进入等待发起人重提状态。 */
+    private ActionResult rejectToStart(Task task, String userId, String comment) {
+        String processInstanceId = task.getProcessInstanceId();
+        runtimeService.setVariable(processInstanceId, "decision_" + task.getTaskDefinitionKey(), "REJECT");
+        addComment(task.getId(), processInstanceId, comment);
+        taskService.complete(task.getId());
+        insertRecord(processInstanceId, task.getId(), task.getTaskDefinitionKey(), task.getName(), userId,
+                displayName(userId), TaskAction.REJECT, comment);
+
+        terminateQuietly(processInstanceId, "REJECT_TO_START");
+
+        BpmInstance projection = requireProjection(processInstanceId);
+        projection.setStatus(InstanceStatus.RUNNING.name());
+        projection.setCurrentNodeName(PENDING_RESUBMIT_NODE);
+        projection.setEndedAt(null);
+        projection.setUpdatedAt(LocalDateTime.now());
+        instanceMapper.updateById(projection);
+
+        return new ActionResult(processInstanceId, projection.getStatus(),
+                PENDING_RESUBMIT_NODE, null);
+    }
+
+    private RejectStrategy rejectStrategyOf(String processInstanceId, String nodeId) {
+        BpmInstance projection = requireProjection(processInstanceId);
+        FlowDefinition definition = definitions.find(projection.getFlowCode());
+        if (definition == null || definition.getFlowSchema() == null) {
+            return RejectStrategy.TO_END;
+        }
+        FlowSchema schema = json.read(definition.getFlowSchema(), FlowSchema.class);
+        return schema.nodes().stream()
+                .filter(n -> nodeId.equals(n.id()))
+                .findFirst()
+                .map(n -> n.props() == null ? RejectStrategy.TO_END : n.props().rejectOrDefault())
+                .orElse(RejectStrategy.TO_END);
+    }
+
+    private void terminateQuietly(String processInstanceId, String reason) {
+        try {
+            runtimeService.deleteProcessInstance(processInstanceId, reason);
+        } catch (FlowableObjectNotFoundException ignored) {
+            // 引擎实例已不存在（如已被其他操作终止），投影状态以数据库为准
+        }
+    }
+
+    private BpmInstance requireProjection(String processInstanceId) {
+        BpmInstance projection = instanceMapper.selectOne(new LambdaQueryWrapper<BpmInstance>()
+                .eq(BpmInstance::getInstanceId, processInstanceId));
+        if (projection == null) {
+            throw new BizException(ErrorCode.INSTANCE_NOT_FOUND, "审批实例不存在：" + processInstanceId);
+        }
+        return projection;
+    }
+
+    /** 发起变量解析：条件求值、审批人解析、抄送人合并。发起与重提共用。 */
+    private Map<String, Object> resolveVariables(FlowDefinition definition, FlowSchema schema,
+                                                 StartCommand command, String title) {
+        Map<String, Object> variables = new LinkedHashMap<>(command.formData());
+        variables.put("initiatorId", command.initiatorId());
+        variables.put("initiatorName", command.initiatorName());
+        if (command.initiatorDeptCode() != null) {
+            variables.put("initiatorDeptCode", command.initiatorDeptCode());
+        }
+        variables.put("instanceTitle", title);
+
+        List<FlowNode> nodes = schema.nodes().subList(1, schema.nodes().size() - 1);
+        for (FlowNode node : nodes) {
+            if (node.condition() != null && !node.condition().isBlank()) {
+                variables.put("cond_" + node.id(), conditionEvaluator.evaluate(node.condition(), variables, node.name()));
+            }
+            if (node.type() == NodeType.APPROVAL) {
+                List<String> approvers = approverResolver.resolve(node, command, variables);
+                approverResolver.requireNotEmpty(approvers, node);
+                variables.put("ap_" + node.id(), approvers);
+                variables.put("decision_" + node.id(), "PENDING");
+            } else if (node.type() == NodeType.CC) {
+                List<String> ccUsers = new ArrayList<>(node.props().ccUsers());
+                ccUsers.addAll(command.ccUsers());
+                variables.put("cc_" + node.id(), new ArrayList<>(new LinkedHashSet<>(ccUsers)));
+            }
+        }
+        return new HashMap<>(variables);
     }
 
     private Task requireActiveTask(String taskId, String userId) {
@@ -216,11 +397,7 @@ public class FlowEngineService {
     }
 
     private ActionResult syncProgress(String processInstanceId, boolean rejected) {
-        BpmInstance projection = instanceMapper.selectOne(new LambdaQueryWrapper<BpmInstance>()
-                .eq(BpmInstance::getInstanceId, processInstanceId));
-        if (projection == null) {
-            throw new BizException(ErrorCode.INSTANCE_NOT_FOUND);
-        }
+        BpmInstance projection = requireProjection(processInstanceId);
         ProcessInstance running = runtimeService.createProcessInstanceQuery()
                 .processInstanceId(processInstanceId).singleResult();
         LocalDateTime now = LocalDateTime.now();
@@ -235,7 +412,8 @@ public class FlowEngineService {
         }
         projection.setUpdatedAt(now);
         instanceMapper.updateById(projection);
-        return new ActionResult(processInstanceId, projection.getStatus(), projection.getCurrentNodeName());
+        return new ActionResult(processInstanceId, projection.getStatus(),
+                projection.getCurrentNodeName(), projection.getEndedAt());
     }
 
     private String activeNodeNames(String processInstanceId) {
@@ -248,11 +426,10 @@ public class FlowEngineService {
     }
 
     private List<TaskView> pendingTasks(String processInstanceId) {
-        BpmInstance projection = instanceMapper.selectOne(new LambdaQueryWrapper<BpmInstance>()
-                .eq(BpmInstance::getInstanceId, processInstanceId));
-        Map<String, String> names = projection == null ? Map.of()
-                : orgService.namesOf(taskService.createTaskQuery().processInstanceId(processInstanceId)
-                .list().stream().map(Task::getAssignee).filter(Objects::nonNull).toList());
+        BpmInstance projection = requireProjection(processInstanceId);
+        Map<String, String> names = orgService.namesOf(taskService.createTaskQuery()
+                .processInstanceId(processInstanceId).list().stream()
+                .map(Task::getAssignee).filter(Objects::nonNull).toList());
         return taskService.createTaskQuery().processInstanceId(processInstanceId)
                 .orderByTaskCreateTime().asc().list().stream()
                 .map(task -> toView(task, projection, names))
@@ -273,11 +450,7 @@ public class FlowEngineService {
     }
 
     private void mergeFormData(String processInstanceId, Map<String, Object> formData) {
-        BpmInstance projection = instanceMapper.selectOne(new LambdaQueryWrapper<BpmInstance>()
-                .eq(BpmInstance::getInstanceId, processInstanceId));
-        if (projection == null) {
-            return;
-        }
+        BpmInstance projection = requireProjection(processInstanceId);
         Map<String, Object> merged = new LinkedHashMap<>(json.readMap(projection.getFormData()));
         merged.putAll(formData);
         projection.setFormData(json.write(merged));

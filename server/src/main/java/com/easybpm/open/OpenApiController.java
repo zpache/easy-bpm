@@ -14,6 +14,9 @@ import com.easybpm.engine.WorkbenchCounts;
 import com.easybpm.engine.WorkbenchQueryService;
 import com.easybpm.flow.FlowDefinition;
 import com.easybpm.flow.FlowDefinitionService;
+import com.easybpm.org.OrgDept;
+import com.easybpm.org.OrgService;
+import com.easybpm.org.OrgUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -38,13 +41,15 @@ public class OpenApiController {
     private final FlowEngineService engine;
     private final WorkbenchQueryService query;
     private final FlowDefinitionService definitions;
+    private final OrgService orgService;
     private final JsonCodec json;
 
     public OpenApiController(FlowEngineService engine, WorkbenchQueryService query,
-                             FlowDefinitionService definitions, JsonCodec json) {
+                             FlowDefinitionService definitions, OrgService orgService, JsonCodec json) {
         this.engine = engine;
         this.query = query;
         this.definitions = definitions;
+        this.orgService = orgService;
         this.json = json;
     }
 
@@ -55,12 +60,26 @@ public class OpenApiController {
     }
 
     @PostMapping("/instances")
-    @Operation(summary = "创建并提交审批", description = "一次调用完成发起；返回实例ID与当前待办任务")
-    public ApiResponse<StartResult> start(@Valid @RequestBody OpenDtos.StartRequest request) {
+    @Operation(summary = "创建并提交审批", description = "一次调用完成发起；返回实例ID与当前待办任务。幂等键优先于参数校验")
+    public ApiResponse<StartResult> start(@RequestBody OpenDtos.StartRequest request) {
         StartCommand command = new StartCommand(request.flowCode(), request.businessKey(), request.title(),
                 request.initiatorId(), request.initiatorName(), request.initiatorDeptCode(),
                 request.formData(), request.ccUsers(), request.callbackUrl(), request.idempotencyKey());
         return ApiResponse.ok(engine.start(command));
+    }
+
+    @PostMapping("/instances/{instanceId}/resubmit")
+    @Operation(summary = "重新提交", description = "TO_START 驳回后，发起人修改表单重新提交，流程从头流转")
+    public ApiResponse<StartResult> resubmit(@PathVariable String instanceId,
+                                             @Valid @RequestBody OpenDtos.ResubmitRequest request) {
+        return ApiResponse.ok(engine.resubmit(instanceId, request.userId(), request.formData(), request.comment()));
+    }
+
+    @PostMapping("/instances/{instanceId}/withdraw")
+    @Operation(summary = "撤回", description = "发起人撤回运行中的审批，实例状态变为 CANCELED")
+    public ApiResponse<ActionResult> withdraw(@PathVariable String instanceId,
+                                              @Valid @RequestBody OpenDtos.WithdrawRequest request) {
+        return ApiResponse.ok(engine.withdraw(instanceId, request.userId(), request.comment()));
     }
 
     @GetMapping("/instances/{instanceId}")
@@ -117,10 +136,57 @@ public class OpenApiController {
     }
 
     @PostMapping("/tasks/{taskId}/reject")
-    @Operation(summary = "驳回", description = "驳回后实例结束，状态为 REJECTED")
+    @Operation(summary = "驳回", description = "按节点驳回策略：TO_END 实例结束（REJECTED），TO_START 退回发起人重新提交")
     public ApiResponse<ActionResult> reject(@PathVariable String taskId,
                                             @Valid @RequestBody OpenDtos.HandleRequest request) {
         return ApiResponse.ok(engine.reject(taskId, request.userId(), request.comment()));
+    }
+
+    @PostMapping("/tasks/{taskId}/transfer")
+    @Operation(summary = "转交", description = "将待办转交给同租户其他在职人员")
+    public ApiResponse<ActionResult> transfer(@PathVariable String taskId,
+                                              @Valid @RequestBody OpenDtos.TransferRequest request) {
+        return ApiResponse.ok(engine.transfer(taskId, request.userId(), request.targetUserId(), request.comment()));
+    }
+
+    @PostMapping("/org/sync")
+    @Operation(summary = "组织同步", description = "批量 upsert 人员 / 部门 / 角色，按编码幂等")
+    public ApiResponse<OrgSyncResult> orgSync(@Valid @RequestBody OpenDtos.OrgSyncRequest request) {
+        int users = 0;
+        if (request.users() != null) {
+            for (OpenDtos.OrgSyncRequest.OrgUserSync u : request.users()) {
+                OrgUser user = new OrgUser();
+                user.setUserCode(u.userCode());
+                user.setName(u.name());
+                user.setDeptCode(u.deptCode());
+                user.setDeptName(u.deptName());
+                user.setLeaderCode(u.leaderCode());
+                user.setTitle(u.title());
+                user.setMobile(u.mobile());
+                user.setEmail(u.email());
+                user.setStatus(u.status());
+                users += orgService.upsertUser(user);
+            }
+        }
+        int depts = 0;
+        if (request.depts() != null) {
+            for (OpenDtos.OrgSyncRequest.OrgDeptSync d : request.depts()) {
+                OrgDept dept = new OrgDept();
+                dept.setDeptCode(d.deptCode());
+                dept.setName(d.name());
+                dept.setParentCode(d.parentCode());
+                dept.setLeaderId(d.leaderId());
+                dept.setSortNo(d.sortNo());
+                depts += orgService.upsertDept(dept);
+            }
+        }
+        int roles = 0;
+        if (request.roles() != null) {
+            for (OpenDtos.OrgSyncRequest.OrgRoleSync r : request.roles()) {
+                roles += orgService.replaceRoles(r.userCode(), r.roleCodes());
+            }
+        }
+        return ApiResponse.ok(new OrgSyncResult(users, depts, roles));
     }
 
     private FlowSummary toSummary(FlowDefinition definition) {
@@ -139,5 +205,8 @@ public class OpenApiController {
 
     public record FlowSummary(String code, String name, String category, String description,
                               Integer version, Object formSchema) {
+    }
+
+    public record OrgSyncResult(int users, int depts, int roles) {
     }
 }
