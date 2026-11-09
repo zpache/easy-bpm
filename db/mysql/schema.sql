@@ -133,7 +133,8 @@ CREATE TABLE IF NOT EXISTS bpm_flow_version (
 CREATE TABLE IF NOT EXISTS bpm_instance (
     id                 VARCHAR(32)  NOT NULL,
     tenant_id          VARCHAR(32)  NOT NULL,
-    instance_id        VARCHAR(64)  NOT NULL COMMENT 'Flowable 流程实例ID',
+    instance_id        VARCHAR(64)  NOT NULL COMMENT '对外实例ID，创建后恒定',
+    engine_instance_id VARCHAR(64)  NULL COMMENT '当前Flowable引擎实例ID，TO_START重提后更换',
     flow_code          VARCHAR(64)  NOT NULL,
     flow_name          VARCHAR(128) NOT NULL,
     flow_version       INT          NOT NULL DEFAULT 1,
@@ -153,6 +154,7 @@ CREATE TABLE IF NOT EXISTS bpm_instance (
     PRIMARY KEY (id),
     UNIQUE KEY uk_instance_process (tenant_id, instance_id),
     UNIQUE KEY uk_instance_idem (tenant_id, idempotency_key),
+    KEY idx_instance_engine (tenant_id, engine_instance_id),
     KEY idx_instance_initiator (tenant_id, initiator_id, started_at),
     KEY idx_instance_status (tenant_id, status, started_at),
     KEY idx_instance_business (tenant_id, business_key),

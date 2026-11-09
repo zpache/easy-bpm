@@ -92,7 +92,7 @@ public class FlowEngineService {
                     .eq(BpmInstance::getIdempotencyKey, command.idempotencyKey()));
             if (existing != null) {
                 return new StartResult(existing.getInstanceId(), existing.getStatus(),
-                        existing.getCurrentNodeName(), pendingTasks(existing.getInstanceId()));
+                        existing.getCurrentNodeName(), pendingTasks(existing.getEngineInstanceId()));
             }
         }
 
@@ -125,7 +125,9 @@ public class FlowEngineService {
         LocalDateTime now = LocalDateTime.now();
         BpmInstance projection = new BpmInstance();
         projection.setId(Ids.id());
+        // 首次发起：对外 ID 与引擎 ID 相同，此后对外 ID 恒定，重提只更换引擎 ID
         projection.setInstanceId(processInstance.getId());
+        projection.setEngineInstanceId(processInstance.getId());
         projection.setFlowCode(definition.getCode());
         projection.setFlowName(definition.getName());
         projection.setFlowVersion(definition.getVersion());
@@ -188,16 +190,16 @@ public class FlowEngineService {
             throw new BizException(ErrorCode.FLOW_NOT_FOUND, "流程未部署或已停用：" + definition.getCode());
         }
 
-        projection.setInstanceId(newProcess.getId());
+        projection.setEngineInstanceId(newProcess.getId());
         projection.setFormData(json.write(merged));
         projection.setUpdatedAt(LocalDateTime.now());
         instanceMapper.updateById(projection);
 
-        insertRecord(newProcess.getId(), null, null, "重新提交", userId,
+        insertRecord(projection.getInstanceId(), null, null, "重新提交", userId,
                 displayName(userId), TaskAction.RESUBMIT, comment);
 
         ActionResult current = syncProgress(newProcess.getId(), false);
-        return new StartResult(newProcess.getId(), current.status(),
+        return new StartResult(projection.getInstanceId(), current.status(),
                 current.currentNodeName(), pendingTasks(newProcess.getId()));
     }
 
@@ -214,7 +216,7 @@ public class FlowEngineService {
             throw new BizException(ErrorCode.FORBIDDEN, "只有发起人可以撤回");
         }
 
-        terminateQuietly(projection.getInstanceId(), "WITHDRAW:" + userId);
+        terminateQuietly(projection.getEngineInstanceId(), "WITHDRAW:" + userId);
 
         LocalDateTime now = LocalDateTime.now();
         projection.setStatus(InstanceStatus.CANCELED.name());
@@ -235,6 +237,7 @@ public class FlowEngineService {
         Task task = requireActiveTask(taskId, userId);
         String processInstanceId = task.getProcessInstanceId();
         String nodeId = task.getTaskDefinitionKey();
+        String externalId = requireProjectionByEngine(processInstanceId).getInstanceId();
 
         runtimeService.setVariable(processInstanceId, "decision_" + nodeId, "APPROVE");
         if (formData != null && !formData.isEmpty()) {
@@ -243,7 +246,7 @@ public class FlowEngineService {
         }
         addComment(taskId, processInstanceId, comment);
         taskService.complete(taskId);
-        insertRecord(processInstanceId, taskId, nodeId, task.getName(), userId,
+        insertRecord(externalId, taskId, nodeId, task.getName(), userId,
                 displayName(userId), TaskAction.APPROVE, comment);
 
         return syncProgress(processInstanceId, false);
@@ -254,6 +257,7 @@ public class FlowEngineService {
         Task task = requireActiveTask(taskId, userId);
         String processInstanceId = task.getProcessInstanceId();
         String nodeId = task.getTaskDefinitionKey();
+        String externalId = requireProjectionByEngine(processInstanceId).getInstanceId();
         RejectStrategy strategy = rejectStrategyOf(processInstanceId, nodeId);
 
         if (strategy == RejectStrategy.TO_START) {
@@ -263,7 +267,7 @@ public class FlowEngineService {
         runtimeService.setVariable(processInstanceId, "decision_" + nodeId, "REJECT");
         addComment(taskId, processInstanceId, comment);
         taskService.complete(taskId);
-        insertRecord(processInstanceId, taskId, nodeId, task.getName(), userId,
+        insertRecord(externalId, taskId, nodeId, task.getName(), userId,
                 displayName(userId), TaskAction.REJECT, comment);
 
         return syncProgress(processInstanceId, true);
@@ -290,7 +294,8 @@ public class FlowEngineService {
         taskService.setAssignee(taskId, targetUserId);
         String note = (comment == null || comment.isBlank() ? "" : comment + "；")
                 + "转交给 " + target.getName();
-        insertRecord(processInstanceId, taskId, task.getTaskDefinitionKey(), task.getName(), userId,
+        insertRecord(requireProjectionByEngine(processInstanceId).getInstanceId(), taskId,
+                task.getTaskDefinitionKey(), task.getName(), userId,
                 displayName(userId), TaskAction.TRANSFER, note);
 
         return syncProgress(processInstanceId, false);
@@ -299,27 +304,28 @@ public class FlowEngineService {
     /** TO_START：终止当前引擎实例，实例进入等待发起人重提状态。 */
     private ActionResult rejectToStart(Task task, String userId, String comment) {
         String processInstanceId = task.getProcessInstanceId();
+        String externalId = requireProjectionByEngine(processInstanceId).getInstanceId();
         runtimeService.setVariable(processInstanceId, "decision_" + task.getTaskDefinitionKey(), "REJECT");
         addComment(task.getId(), processInstanceId, comment);
         taskService.complete(task.getId());
-        insertRecord(processInstanceId, task.getId(), task.getTaskDefinitionKey(), task.getName(), userId,
+        insertRecord(externalId, task.getId(), task.getTaskDefinitionKey(), task.getName(), userId,
                 displayName(userId), TaskAction.REJECT, comment);
 
         terminateQuietly(processInstanceId, "REJECT_TO_START");
 
-        BpmInstance projection = requireProjection(processInstanceId);
+        BpmInstance projection = requireProjectionByEngine(processInstanceId);
         projection.setStatus(InstanceStatus.RUNNING.name());
         projection.setCurrentNodeName(PENDING_RESUBMIT_NODE);
         projection.setEndedAt(null);
         projection.setUpdatedAt(LocalDateTime.now());
         instanceMapper.updateById(projection);
 
-        return new ActionResult(processInstanceId, projection.getStatus(),
+        return new ActionResult(externalId, projection.getStatus(),
                 PENDING_RESUBMIT_NODE, null);
     }
 
     private RejectStrategy rejectStrategyOf(String processInstanceId, String nodeId) {
-        BpmInstance projection = requireProjection(processInstanceId);
+        BpmInstance projection = requireProjectionByEngine(processInstanceId);
         FlowDefinition definition = definitions.find(projection.getFlowCode());
         if (definition == null || definition.getFlowSchema() == null) {
             return RejectStrategy.TO_END;
@@ -340,11 +346,22 @@ public class FlowEngineService {
         }
     }
 
-    private BpmInstance requireProjection(String processInstanceId) {
+    /** 按对外实例 ID 查投影（resubmit / withdraw 等入口）。 */
+    private BpmInstance requireProjection(String instanceId) {
         BpmInstance projection = instanceMapper.selectOne(new LambdaQueryWrapper<BpmInstance>()
-                .eq(BpmInstance::getInstanceId, processInstanceId));
+                .eq(BpmInstance::getInstanceId, instanceId));
         if (projection == null) {
-            throw new BizException(ErrorCode.INSTANCE_NOT_FOUND, "审批实例不存在：" + processInstanceId);
+            throw new BizException(ErrorCode.INSTANCE_NOT_FOUND, "审批实例不存在：" + instanceId);
+        }
+        return projection;
+    }
+
+    /** 按引擎实例 ID 查投影（Flowable 回调路径）。 */
+    private BpmInstance requireProjectionByEngine(String engineInstanceId) {
+        BpmInstance projection = instanceMapper.selectOne(new LambdaQueryWrapper<BpmInstance>()
+                .eq(BpmInstance::getEngineInstanceId, engineInstanceId));
+        if (projection == null) {
+            throw new BizException(ErrorCode.INSTANCE_NOT_FOUND, "审批实例不存在：" + engineInstanceId);
         }
         return projection;
     }
@@ -397,7 +414,7 @@ public class FlowEngineService {
     }
 
     private ActionResult syncProgress(String processInstanceId, boolean rejected) {
-        BpmInstance projection = requireProjection(processInstanceId);
+        BpmInstance projection = requireProjectionByEngine(processInstanceId);
         ProcessInstance running = runtimeService.createProcessInstanceQuery()
                 .processInstanceId(processInstanceId).singleResult();
         LocalDateTime now = LocalDateTime.now();
@@ -426,7 +443,7 @@ public class FlowEngineService {
     }
 
     private List<TaskView> pendingTasks(String processInstanceId) {
-        BpmInstance projection = requireProjection(processInstanceId);
+        BpmInstance projection = requireProjectionByEngine(processInstanceId);
         Map<String, String> names = orgService.namesOf(taskService.createTaskQuery()
                 .processInstanceId(processInstanceId).list().stream()
                 .map(Task::getAssignee).filter(Objects::nonNull).toList());
@@ -450,7 +467,7 @@ public class FlowEngineService {
     }
 
     private void mergeFormData(String processInstanceId, Map<String, Object> formData) {
-        BpmInstance projection = requireProjection(processInstanceId);
+        BpmInstance projection = requireProjectionByEngine(processInstanceId);
         Map<String, Object> merged = new LinkedHashMap<>(json.readMap(projection.getFormData()));
         merged.putAll(formData);
         projection.setFormData(json.write(merged));

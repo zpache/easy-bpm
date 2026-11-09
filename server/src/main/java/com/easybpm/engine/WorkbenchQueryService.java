@@ -170,7 +170,8 @@ public class WorkbenchQueryService {
                         r.getOperatorName(), r.getComment(), r.getCreatedAt()))
                 .toList();
 
-        List<Task> active = taskService.createTaskQuery().processInstanceId(instanceId)
+        List<Task> active = taskService.createTaskQuery()
+                .processInstanceId(instance.getEngineInstanceId())
                 .orderByTaskCreateTime().asc().list();
         Map<String, String> names = namesOf(active.stream().map(Task::getAssignee).toList());
         List<TaskView> pending = active.stream()
@@ -205,14 +206,14 @@ public class WorkbenchQueryService {
                 instance.getStartedAt(), instance.getEndedAt());
     }
 
-    private Map<String, BpmInstance> instanceMap(Collection<String> instanceIds) {
-        if (instanceIds == null || instanceIds.isEmpty()) {
+    private Map<String, BpmInstance> instanceMap(Collection<String> engineInstanceIds) {
+        if (engineInstanceIds == null || engineInstanceIds.isEmpty()) {
             return Map.of();
         }
         Map<String, BpmInstance> result = new LinkedHashMap<>();
         instanceMapper.selectList(new LambdaQueryWrapper<BpmInstance>()
-                        .in(BpmInstance::getInstanceId, instanceIds))
-                .forEach(i -> result.put(i.getInstanceId(), i));
+                        .in(BpmInstance::getEngineInstanceId, engineInstanceIds))
+                .forEach(i -> result.put(i.getEngineInstanceId(), i));
         return result;
     }
 
@@ -238,7 +239,8 @@ public class WorkbenchQueryService {
                 .like(BpmInstance::getTitle, keyword)
                 .eq(flowCode != null && !flowCode.isBlank(), BpmInstance::getFlowCode, flowCode)
                 .last("limit " + MAX_KEYWORD_HITS));
-        return new ArrayList<>(matches.stream().map(BpmInstance::getInstanceId).toList());
+        // 待办/已办走 Flowable 引擎查询，需要引擎实例 ID
+        return new ArrayList<>(matches.stream().map(BpmInstance::getEngineInstanceId).toList());
     }
 
     private int offset(int page, int size) {

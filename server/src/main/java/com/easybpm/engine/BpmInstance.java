@@ -16,7 +16,10 @@ public class BpmInstance {
 
     @TableId(type = IdType.INPUT)
     private String id;
+    /** 对外实例 ID，创建后恒定不变，接入方以此为准。 */
     private String instanceId;
+    /** 当前 Flowable 引擎实例 ID。TO_START 驳回重提后会更换，与对外 ID 分离。 */
+    private String engineInstanceId;
     private String flowCode;
     private String flowName;
     private Integer flowVersion;
