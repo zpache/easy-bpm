@@ -65,6 +65,17 @@ public class OrgService {
                 .stream().map(OrgUserRole::getUserCode).distinct().toList();
     }
 
+    /** 过滤出状态为 ACTIVE 的人员（不存在或已停用的一律剔除），用于审批人解析。 */
+    public List<String> filterActive(Collection<String> userCodes) {
+        if (userCodes == null || userCodes.isEmpty()) {
+            return List.of();
+        }
+        return userMapper.selectList(new LambdaQueryWrapper<OrgUser>()
+                        .in(OrgUser::getUserCode, userCodes)
+                        .eq(OrgUser::getStatus, "ACTIVE"))
+                .stream().map(OrgUser::getUserCode).distinct().toList();
+    }
+
     public Map<String, String> namesOf(Collection<String> userCodes) {
         if (userCodes == null || userCodes.isEmpty()) {
             return Map.of();

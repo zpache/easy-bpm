@@ -41,7 +41,8 @@ public class ApproverResolver {
             case FORM_FIELD -> formFieldUsers(props, variables);
             case SELF -> List.of(command.initiatorId());
         };
-        return normalize(raw);
+        // 统一收口：剔除不存在或已停用的人员，避免审批任务指派给不可用账号
+        return orgService.filterActive(normalize(raw));
     }
 
     private List<String> leaderOf(String userCode, int level) {
