@@ -215,8 +215,9 @@ public class ConsolePlatformController {
     }
 
     private TenantView toView(Tenant tenant) {
-        Long consoleUsers = TenantContext.callAs(tenant.getId(),
-                () -> consoleUserMapper.selectCount(null));
+        // bpm_console_user 不参与租户插件自动隔离，统计必须显式按 tenantId 过滤
+        Long consoleUsers = consoleUserMapper.selectCount(new LambdaQueryWrapper<ConsoleUser>()
+                .eq(ConsoleUser::getTenantId, tenant.getId()));
         Long flows = TenantContext.callAs(tenant.getId(),
                 () -> flowDefinitionMapper.selectCount(new LambdaQueryWrapper<FlowDefinition>()
                         .eq(FlowDefinition::getStatus, "PUBLISHED")));
