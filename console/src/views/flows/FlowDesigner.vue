@@ -16,7 +16,7 @@
 
     <div class="designer">
       <template v-for="(node, index) in nodes" :key="node.id + index">
-        <div class="node" :class="[nodeClass(node), { selected: selectedIndex === index }]" @click="selectedIndex = index">
+        <div class="node" :class="[nodeClass(node), { selected: selectedIndex === index, editable: canEditNode(node) }]" @click="openNodeEdit(index)">
           <div class="node-type">{{ nodeLabel(node.type) }}</div>
           <div class="node-name">{{ node.name }}</div>
           <div v-if="node.type === 'APPROVAL' && node.props" class="node-props">
@@ -34,7 +34,7 @@
       </template>
     </div>
 
-    <el-drawer v-model="drawerVisible" :title="editing ? '编辑节点' : '新增节点'" size="440px">
+    <el-drawer v-model="drawerVisible" :title="isNewNode ? '新增节点' : `编辑${nodeLabel(editing?.type ?? 'APPROVAL')}节点`" size="440px">
       <el-form v-if="editing" :model="editing" label-width="100px">
         <el-form-item label="节点名称">
           <el-input v-model="editing.name" />
@@ -121,6 +121,26 @@ const nodes = ref<FlowNode[]>([])
 const selectedIndex = ref(-1)
 const drawerVisible = ref(false)
 const editing = ref<(FlowNode & { props: NodeProps }) | null>(null)
+const isNewNode = ref(false)
+
+function canEditNode(node: FlowNode): boolean {
+  return auth.isTenantAdmin && flow.value?.status !== 'DISABLED' && (node.type === 'APPROVAL' || node.type === 'CC')
+}
+
+function openNodeEdit(index: number) {
+  selectedIndex.value = index
+  const node = nodes.value[index]
+  if (!canEditNode(node)) return
+  // 属性缺省值补齐，保证抽屉表单可完整编辑
+  if (node.type === 'APPROVAL') {
+    node.props = { approverType: 'INITIATOR_LEADER', leaderLevel: 1, mode: 'ANY', rejectStrategy: 'TO_END', ...node.props }
+  } else if (node.type === 'CC') {
+    node.props = { ccUsers: '', ...node.props }
+  }
+  editing.value = node as FlowNode & { props: NodeProps }
+  isNewNode.value = false
+  drawerVisible.value = true
+}
 
 function nodeClass(node: FlowNode) {
   return { start: node.type === 'START', approval: node.type === 'APPROVAL', cc: node.type === 'CC', end: node.type === 'END' }
@@ -175,6 +195,7 @@ function insertAfter(index: number, type: 'APPROVAL' | 'CC' = 'APPROVAL') {
   nodes.value.splice(index + 1, 0, node)
   selectedIndex.value = index + 1
   editing.value = node
+  isNewNode.value = true
   drawerVisible.value = true
 }
 
@@ -292,7 +313,7 @@ onMounted(async () => {
 .flow-title { font-weight: 600; }
 .designer { max-width: 420px; margin: 0 auto; padding: 24px 0; }
 .node { border: 1px solid #dcdfe6; border-radius: 10px; padding: 12px 16px; cursor: pointer; background: #fff; transition: all 0.2s; }
-.node:hover { border-color: #0960bd; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(9, 96, 189, 0.12); }
+.node.editable:hover { border-color: #0960bd; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(9, 96, 189, 0.12); }
 .node.selected { border-color: #0960bd; box-shadow: 0 0 0 2px rgba(9, 96, 189, 0.18); }
 .node.start, .node.end { background: #f4f7fb; text-align: center; }
 .node.approval { background: #eef5ff; }
