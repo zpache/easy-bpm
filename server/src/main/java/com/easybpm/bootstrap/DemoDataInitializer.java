@@ -39,6 +39,8 @@ public class DemoDataInitializer implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(DemoDataInitializer.class);
     private static final String TENANT_ID = "t-demo";
     private static final String TENANT_CODE = "demo";
+    private static final String PLATFORM_TENANT_ID = "t-platform";
+    private static final String PLATFORM_TENANT_CODE = "platform";
     private static final String APP_KEY = "ak_demo";
     private static final String APP_SECRET = "sk_demo_2026";
 
@@ -107,7 +109,41 @@ public class DemoDataInitializer implements ApplicationRunner {
             seedConsoleUsers(now);
             seedFlows();
         });
-        log.info("easy-bpm 演示数据就绪：tenant={}, appKey={}, 控制台 admin/admin123", TENANT_CODE, APP_KEY);
+        seedPlatformTenant(now);
+        log.info("easy-bpm 演示数据就绪：tenant={}, appKey={}, 控制台 admin/admin123, 平台管理员 platadmin/admin123 (tenant=platform)",
+                TENANT_CODE, APP_KEY);
+    }
+
+    /**
+     * 平台租户 + 平台管理员（角色 PLATFORM_ADMIN），用于平台管理页面登录与租户管理。
+     */
+    private void seedPlatformTenant(LocalDateTime now) {
+        if (tenantMapper.selectById(PLATFORM_TENANT_ID) == null) {
+            Tenant tenant = new Tenant();
+            tenant.setId(PLATFORM_TENANT_ID);
+            tenant.setCode(PLATFORM_TENANT_CODE);
+            tenant.setName("平台管理");
+            tenant.setStatus("ACTIVE");
+            tenant.setRemark("easy-bpm 平台运营方租户，承载平台管理员账号");
+            tenant.setCreatedAt(now);
+            tenant.setUpdatedAt(now);
+            tenantMapper.insert(tenant);
+        }
+        TenantContext.runAs(PLATFORM_TENANT_ID, () -> {
+            if (consoleUserMapper.selectOne(new LambdaQueryWrapper<ConsoleUser>()
+                    .eq(ConsoleUser::getUsername, "platadmin")) != null) {
+                return;
+            }
+            ConsoleUser user = new ConsoleUser();
+            user.setId(Ids.id());
+            user.setUsername("platadmin");
+            user.setPasswordHash(passwordService.hash("admin123"));
+            user.setDisplayName("平台管理员");
+            user.setRole("PLATFORM_ADMIN");
+            user.setStatus("ACTIVE");
+            user.setCreatedAt(now);
+            consoleUserMapper.insert(user);
+        });
     }
 
     private void seedOrg(LocalDateTime now) {

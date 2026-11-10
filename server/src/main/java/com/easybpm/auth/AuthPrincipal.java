@@ -13,4 +13,8 @@ public record AuthPrincipal(String consoleUserId, String tenantId, String displa
     public boolean isTenantAdmin() {
         return "TENANT_ADMIN".equals(role) || "PLATFORM_ADMIN".equals(role);
     }
+
+    public boolean isPlatformAdmin() {
+        return "PLATFORM_ADMIN".equals(role);
+    }
 }

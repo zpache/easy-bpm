@@ -87,6 +87,7 @@ java -jar target/easy-bpm-server-1.0.0.jar --spring.profiles.active=local
 |---|---|
 | 租户编码 | `demo` |
 | 控制台账号 | `admin / admin123`（李四 `lisi`、王五 `wangwu`，密码同） |
+| 平台管理员 | 租户编码 `platform`，账号 `platadmin / admin123`（角色 PLATFORM_ADMIN） |
 | AppKey / AppSecret | `ak_demo` / `sk_demo_2026` |
 | 演示流程 | `leave` 请假审批、`expense` 费用报销（金额 > 5000 加财务审批） |
 
@@ -132,6 +133,10 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | GET | `/org/depts\|users\|roles` | 组织数据只读查询（写入走 OpenAPI /org/sync） |
 | GET | `/tenant/info` | 当前租户信息 |
 | GET/POST | `/tenant/credentials` | 凭证列表（Secret 掩码）/ 新建（Secret 仅此一次完整返回） |
+| GET/POST | `/platform/tenants` | 平台管理员：租户列表（含账号/凭证/流程/实例统计）/ 新建租户（可带初始管理员） |
+| POST | `/platform/tenants/{id}` | 编辑租户名称与备注 |
+| POST | `/platform/tenants/{id}/disable\|enable` | 停用 / 启用租户（停用后该租户控制台登录与 OpenAPI 全部拒绝） |
+| POST | `/platform/tenants/{id}/switch` | 平台管理员切换进入目标租户（签发临时 token，前端可一键返回平台视角） |
 | POST | `/tenant/credentials/{id}/rotate` | 轮换 AppSecret（旧密钥立即失效，新密钥仅此一次返回） |
 | POST | `/tenant/credentials/{id}/disable` | 停用凭证 |
 | GET | `/dashboard/summary` | 首页统计 |
