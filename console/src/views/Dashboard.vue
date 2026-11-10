@@ -107,7 +107,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="currentNodeName" label="当前节点" width="160" />
-        <el-table-column prop="startedAt" label="发起时间" width="180" />
+        <el-table-column prop="startedAt" label="发起时间" width="180">
+          <template #default="{ row }">{{ fmtDateTime(row.startedAt) }}</template>
+        </el-table-column>
       </el-table>
     </el-card>
   </div>
@@ -119,6 +121,7 @@ import { useRouter } from 'vue-router'
 import { ArrowRight, CircleCheck, CircleClose, DataLine, Loading, Timer, TrendCharts } from '@element-plus/icons-vue'
 import { dashboardStats, dashboardSummary, type DashboardStats } from '@/api/workbench'
 import { useAuthStore } from '@/stores/auth'
+import { fmtDateTime } from '@/utils/format'
 import { statusText, statusType } from '@/utils/labels'
 
 const auth = useAuthStore()

@@ -43,10 +43,10 @@
           <template #default="{ row }">{{ row.status === 'RUNNING' ? (row.currentNodeName || '-') : '-' }}</template>
         </el-table-column>
         <el-table-column prop="startedAt" label="发起时间" width="170">
-          <template #default="{ row }">{{ fmt(row.startedAt) }}</template>
+          <template #default="{ row }">{{ fmtDateTime(row.startedAt) }}</template>
         </el-table-column>
         <el-table-column prop="endedAt" label="结束时间" width="170">
-          <template #default="{ row }">{{ fmt(row.endedAt) }}</template>
+          <template #default="{ row }">{{ fmtDateTime(row.endedAt) }}</template>
         </el-table-column>
         <el-table-column prop="businessKey" label="业务单号" width="140" show-overflow-tooltip>
           <template #default="{ row }">{{ row.businessKey || '-' }}</template>
@@ -75,6 +75,7 @@ import { Search } from '@element-plus/icons-vue'
 import { allInstances } from '@/api/workbench'
 import { listFlows } from '@/api/flows'
 import { statusText, statusType } from '@/utils/labels'
+import { fmtDateTime } from '@/utils/format'
 import type { FlowDefinition, InstanceView } from '@/api/types'
 
 const router = useRouter()
@@ -120,10 +121,6 @@ function reload() {
 
 function openDetail(row: InstanceView) {
   router.push(`/instances/${row.instanceId}`)
-}
-
-function fmt(value?: string) {
-  return value ? value.replace('T', ' ').slice(0, 19) : '-'
 }
 
 onMounted(async () => {

@@ -10,7 +10,9 @@
     </div>
     <el-table :data="logs" v-loading="loading">
       <template #empty><el-empty description="暂无审计记录" :image-size="80" /></template>
-      <el-table-column prop="createdAt" label="时间" width="180" />
+      <el-table-column prop="createdAt" label="时间" width="180">
+        <template #default="{ row }">{{ fmtDateTime(row.createdAt) }}</template>
+      </el-table-column>
       <el-table-column prop="action" label="操作" width="150">
         <template #default="{ row }">
           <el-tag size="small" effect="light" round :type="actionTagType(row.action)">{{ actionLabel(row.action) }}</el-tag>
@@ -38,6 +40,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { fmtDateTime } from '@/utils/format'
 import { auditLogs } from '@/api/audit'
 import type { AuditView } from '@/api/types'
 

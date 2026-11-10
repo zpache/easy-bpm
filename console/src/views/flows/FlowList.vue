@@ -14,7 +14,9 @@
       </el-table-column>
       <el-table-column prop="version" label="版本" width="70" />
       <el-table-column prop="description" label="描述" min-width="180" show-overflow-tooltip />
-      <el-table-column prop="updatedAt" label="更新时间" width="180" />
+      <el-table-column prop="updatedAt" label="更新时间" width="180">
+        <template #default="{ row }">{{ fmtDateTime(row.updatedAt) }}</template>
+      </el-table-column>
       <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="goDesign(row)">设计审批流程</el-button>
@@ -57,6 +59,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteFlow, disableFlow, enableFlow, listFlows, saveFlow } from '@/api/flows'
 import { useAuthStore } from '@/stores/auth'
 import { statusText, statusType } from '@/utils/labels'
+import { fmtDateTime } from '@/utils/format'
 import type { FlowDefinition } from '@/api/types'
 
 const router = useRouter()

@@ -37,14 +37,14 @@
       <el-table-column prop="initiatorName" label="发起人" width="100" />
       <el-table-column v-if="tab === 'todo'" prop="assigneeName" label="处理人" width="100" />
       <el-table-column v-if="tab === 'todo'" prop="createTime" label="到达时间" width="165">
-        <template #default="{ row }">{{ fmt(row.createTime) }}</template>
+        <template #default="{ row }">{{ fmtDateTime(row.createTime) }}</template>
       </el-table-column>
       <template v-else>
         <el-table-column label="耗时" width="100">
           <template #default="{ row }">{{ duration(row.createTime, row.endTime) }}</template>
         </el-table-column>
         <el-table-column prop="endTime" label="处理时间" width="165">
-          <template #default="{ row }">{{ fmt(row.endTime) }}</template>
+          <template #default="{ row }">{{ fmtDateTime(row.endTime) }}</template>
         </el-table-column>
         <el-table-column label="我的处理" width="100">
           <template #default="{ row }">
@@ -92,6 +92,7 @@ import { Refresh, Search } from '@element-plus/icons-vue'
 import { approveTask, doneTasks, rejectTask, todoTasks } from '@/api/workbench'
 import type { TaskView } from '@/api/types'
 import { actionText, actionType } from '@/utils/labels'
+import { fmtDateTime } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -155,10 +156,6 @@ function goDetail(instanceId: string) {
 
 function goDetailRow(row: TaskView) {
   goDetail(row.processInstanceId)
-}
-
-function fmt(value?: string) {
-  return value ? value.replace('T', ' ').slice(0, 19) : '-'
 }
 
 function duration(start?: string, end?: string) {
