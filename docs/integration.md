@@ -159,6 +159,39 @@ GET /open/v1/tasks/count?userId=u1002
 - `keyword` 匹配实例标题（最多命中 200 条后过滤）；
 - `submitted` 的 `status` 可选 `RUNNING / APPROVED / REJECTED / CANCELED`。
 
+### 3.3.1 抄送我的
+
+```
+GET  /open/v1/cc?userId=u1002&page=1&size=20&unreadOnly=true&keyword=报销
+POST /open/v1/cc/{id}/read?userId=u1002
+```
+
+```json
+{
+  "code": 0,
+  "data": {
+    "list": [
+      {
+        "id": "cc_9f3c...",
+        "instanceId": "363c8e05-...",
+        "nodeName": "知会财务",
+        "instanceTitle": "差旅报销 - 张三",
+        "flowName": "费用报销",
+        "initiatorName": "张三",
+        "instanceStatus": "APPROVED",
+        "read": false,
+        "createdAt": "2026-11-10T12:30:00"
+      }
+    ],
+    "total": 1
+  }
+}
+```
+
+- 抄送节点流转时自动写入，接入方无需额外调用；
+- `unreadOnly=true` 只返回未读；标记已读仅限本人（他人调用返回 403），重复调用幂等；
+- `/tasks/count` 额外返回 `ccUnread`，可直接用于红点。
+
 ### 3.4 同意
 
 ```

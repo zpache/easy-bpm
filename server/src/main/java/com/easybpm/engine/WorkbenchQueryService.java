@@ -43,6 +43,7 @@ public class WorkbenchQueryService {
     private final HistoryService historyService;
     private final BpmInstanceMapper instanceMapper;
     private final BpmTaskRecordMapper recordMapper;
+    private final BpmCcMapper ccMapper;
     private final JsonCodec json;
     private final OrgService orgService;
     private final BpmnCompiler compiler;
@@ -50,12 +51,13 @@ public class WorkbenchQueryService {
 
     public WorkbenchQueryService(TaskService taskService, HistoryService historyService,
                                  BpmInstanceMapper instanceMapper, BpmTaskRecordMapper recordMapper,
-                                 JsonCodec json, OrgService orgService, BpmnCompiler compiler,
-                                 FlowDefinitionMapper flowMapper) {
+                                 BpmCcMapper ccMapper, JsonCodec json, OrgService orgService,
+                                 BpmnCompiler compiler, FlowDefinitionMapper flowMapper) {
         this.taskService = taskService;
         this.historyService = historyService;
         this.instanceMapper = instanceMapper;
         this.recordMapper = recordMapper;
+        this.ccMapper = ccMapper;
         this.json = json;
         this.orgService = orgService;
         this.compiler = compiler;
@@ -158,7 +160,77 @@ public class WorkbenchQueryService {
                 .taskTenantId(tenantId).taskAssignee(userId).finished().count();
         long submitted = instanceMapper.selectCount(new LambdaQueryWrapper<BpmInstance>()
                 .eq(BpmInstance::getInitiatorId, userId));
-        return new WorkbenchCounts(todo, done, submitted);
+        long ccUnread = ccMapper.selectCount(new LambdaQueryWrapper<BpmCc>()
+                .eq(BpmCc::getUserId, userId)
+                .eq(BpmCc::getReadFlag, 0));
+        return new WorkbenchCounts(todo, done, submitted, ccUnread);
+    }
+
+    /**
+     * 抄送我的：按接收人分页查询，可按关键字（实例标题）与未读过滤。
+     */
+    public PageResult<CcView> cc(String userId, int page, int size, boolean unreadOnly, String keyword) {
+        LambdaQueryWrapper<BpmCc> wrapper = new LambdaQueryWrapper<BpmCc>()
+                .eq(BpmCc::getUserId, userId)
+                .eq(unreadOnly, BpmCc::getReadFlag, 0)
+                .orderByDesc(BpmCc::getCreatedAt);
+        if (keyword != null && !keyword.isBlank()) {
+            List<String> instanceIds = instanceMapper.selectList(new LambdaQueryWrapper<BpmInstance>()
+                            .like(BpmInstance::getTitle, keyword)
+                            .last("limit " + MAX_KEYWORD_HITS))
+                    .stream().map(BpmInstance::getInstanceId).toList();
+            if (instanceIds.isEmpty()) {
+                return PageResult.empty(page, size);
+            }
+            wrapper.in(BpmCc::getInstanceId, instanceIds);
+        }
+        Page<BpmCc> result = ccMapper.selectPage(new Page<>(page, size), wrapper);
+        if (result.getRecords().isEmpty()) {
+            return PageResult.of(List.of(), result.getTotal(), page, size);
+        }
+        Map<String, BpmInstance> instances = instanceByExternalId(
+                result.getRecords().stream().map(BpmCc::getInstanceId).toList());
+        List<CcView> views = result.getRecords().stream()
+                .map(cc -> toCcView(cc, instances.get(cc.getInstanceId())))
+                .toList();
+        return PageResult.of(views, result.getTotal(), page, size);
+    }
+
+    /**
+     * 标记抄送已读。只允许本人操作自己的抄送记录，重复标记幂等。
+     */
+    public void markCcRead(String id, String userId) {
+        BpmCc cc = ccMapper.selectById(id);
+        if (cc == null) {
+            throw new BizException(ErrorCode.INSTANCE_NOT_FOUND, "抄送记录不存在：" + id);
+        }
+        if (!Objects.equals(cc.getUserId(), userId)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "只能标记自己的抄送记录");
+        }
+        if (cc.getReadFlag() != null && cc.getReadFlag() == 1) {
+            return;
+        }
+        cc.setReadFlag(1);
+        ccMapper.updateById(cc);
+    }
+
+    private CcView toCcView(BpmCc cc, BpmInstance instance) {
+        return new CcView(cc.getId(), cc.getInstanceId(), cc.getNodeId(), cc.getNodeName(),
+                titleOf(instance), flowCodeOf(instance), flowNameOf(instance), initiatorOf(instance),
+                instance == null ? null : instance.getStatus(),
+                cc.getReadFlag() != null && cc.getReadFlag() == 1,
+                cc.getCreatedAt());
+    }
+
+    private Map<String, BpmInstance> instanceByExternalId(Collection<String> instanceIds) {
+        if (instanceIds == null || instanceIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, BpmInstance> result = new LinkedHashMap<>();
+        instanceMapper.selectList(new LambdaQueryWrapper<BpmInstance>()
+                        .in(BpmInstance::getInstanceId, instanceIds))
+                .forEach(i -> result.put(i.getInstanceId(), i));
+        return result;
     }
 
     public InstanceDetail detail(String instanceId) {

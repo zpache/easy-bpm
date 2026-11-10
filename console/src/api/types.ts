@@ -96,6 +96,21 @@ export interface WorkbenchCounts {
   todo: number
   done: number
   submitted: number
+  ccUnread: number
+}
+
+export interface CcView {
+  id: string
+  instanceId: string
+  nodeId?: string
+  nodeName?: string
+  instanceTitle?: string
+  flowCode?: string
+  flowName?: string
+  initiatorName?: string
+  instanceStatus?: string
+  read: boolean
+  createdAt?: string
 }
 
 export interface OrgDeptView {
