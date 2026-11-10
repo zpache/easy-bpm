@@ -181,6 +181,12 @@ public class ConsoleOrgController {
                 .eq(OrgUser::getLeaderCode, userCode)) > 0) {
             throw new BizException(ErrorCode.CONFLICT, "该人员是其他人员的直属主管，请先调整其下属的主管设置");
         }
+        List<OrgDept> leadingDepts = deptMapper.selectList(new LambdaQueryWrapper<OrgDept>()
+                .eq(OrgDept::getLeaderId, userCode));
+        if (!leadingDepts.isEmpty()) {
+            String names = leadingDepts.stream().map(OrgDept::getName).toList().toString();
+            throw new BizException(ErrorCode.CONFLICT, "该人员是部门主管：" + names + "，请先调整相关部门的主管设置");
+        }
         roleMapper.delete(new LambdaQueryWrapper<OrgUserRole>().eq(OrgUserRole::getUserCode, userCode));
         userMapper.deleteById(user.getId());
         audit.record("USER_DELETE", "USER", userCode, "删除人员「" + user.getName() + "」(" + userCode + ")，角色已同步清除");
