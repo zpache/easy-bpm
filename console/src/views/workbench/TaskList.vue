@@ -1,48 +1,78 @@
 <template>
   <el-card>
     <div class="toolbar">
-      <el-tabs v-model="tab" style="flex: 1" @tab-change="onTab">
+      <el-tabs v-model="tab" class="toolbar-tabs" @tab-change="onTab">
         <el-tab-pane label="待办" name="todo" />
         <el-tab-pane label="已办" name="done" />
       </el-tabs>
-      <el-input v-model="keyword" placeholder="按标题搜索" clearable style="width: 240px" @keyup.enter="load" @clear="load" />
-      <el-button style="margin-left: 8px" @click="load">搜索</el-button>
+      <div class="toolbar-right">
+        <el-input
+          v-model="keyword"
+          placeholder="按标题搜索"
+          clearable
+          style="width: 220px"
+          :prefix-icon="Search"
+          @keyup.enter="reload"
+          @clear="reload"
+        />
+        <el-button @click="reload">
+          <el-icon><Refresh /></el-icon>
+        </el-button>
+      </div>
     </div>
 
-    <el-table :data="tasks" v-loading="loading">
+    <el-table :data="tasks" v-loading="loading" stripe @row-click="goDetailRow">
+      <template #empty>
+        <el-empty :description="tab === 'todo' ? '暂无待办任务' : '暂无已办任务'" :image-size="80" />
+      </template>
       <el-table-column prop="instanceTitle" label="审批标题" min-width="220" show-overflow-tooltip>
         <template #default="{ row }">
-          <el-link type="primary" @click="goDetail(row.processInstanceId)">{{ row.instanceTitle }}</el-link>
+          <el-link type="primary" :underline="false" @click.stop="goDetail(row.processInstanceId)">
+            {{ row.instanceTitle }}
+          </el-link>
         </template>
       </el-table-column>
-      <el-table-column prop="flowName" label="流程" width="150" />
-      <el-table-column prop="nodeName" label="节点" width="140" />
-      <el-table-column prop="initiatorName" label="发起人" width="110" />
-      <el-table-column prop="assigneeName" label="处理人" width="110" />
-      <el-table-column v-if="tab === 'todo'" prop="createTime" label="到达时间" width="180" />
-      <el-table-column v-else prop="endTime" label="处理时间" width="180" />
-      <el-table-column v-if="tab === 'done'" label="操作" width="100">
-        <template #default="{ row }">
-          <el-tag size="small" :type="row.action === 'REJECT' ? 'danger' : row.action === 'TRANSFER' ? 'warning' : 'success'">
-            {{ actionText(row.action) }}
-          </el-tag>
-        </template>
+      <el-table-column prop="flowName" label="流程" width="150" show-overflow-tooltip />
+      <el-table-column prop="nodeName" label="节点" width="130" show-overflow-tooltip />
+      <el-table-column prop="initiatorName" label="发起人" width="100" />
+      <el-table-column v-if="tab === 'todo'" prop="assigneeName" label="处理人" width="100" />
+      <el-table-column v-if="tab === 'todo'" prop="createTime" label="到达时间" width="165">
+        <template #default="{ row }">{{ fmt(row.createTime) }}</template>
       </el-table-column>
-      <el-table-column v-if="tab === 'todo'" label="操作" width="180">
+      <template v-else>
+        <el-table-column label="耗时" width="100">
+          <template #default="{ row }">{{ duration(row.createTime, row.endTime) }}</template>
+        </el-table-column>
+        <el-table-column prop="endTime" label="处理时间" width="165">
+          <template #default="{ row }">{{ fmt(row.endTime) }}</template>
+        </el-table-column>
+        <el-table-column label="我的处理" width="100">
+          <template #default="{ row }">
+            <el-tag size="small" :type="actionType(row.action)" effect="light" round>
+              {{ actionText(row.action) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+      </template>
+      <el-table-column v-if="tab === 'todo'" label="操作" width="160" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" type="success" @click="handle(row, 'approve')">同意</el-button>
-          <el-button size="small" type="danger" @click="handle(row, 'reject')">驳回</el-button>
+          <el-button size="small" type="success" plain @click.stop="handle(row, 'approve')">同意</el-button>
+          <el-button size="small" type="danger" plain @click.stop="handle(row, 'reject')">驳回</el-button>
         </template>
       </el-table-column>
     </el-table>
-    <el-pagination
-      v-model:current-page="page"
-      :page-size="size"
-      :total="total"
-      layout="total, prev, pager, next"
-      style="margin-top: 12px; justify-content: flex-end"
-      @current-change="load"
-    />
+
+    <div class="pager">
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="size"
+        :total="total"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next"
+        @current-change="load"
+        @size-change="reload"
+      />
+    </div>
 
     <el-dialog v-model="handleVisible" :title="handleAction === 'approve' ? '同意' : '驳回'" width="440px">
       <el-input v-model="comment" type="textarea" :rows="3" placeholder="审批意见" />
@@ -58,9 +88,10 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Refresh, Search } from '@element-plus/icons-vue'
 import { approveTask, doneTasks, rejectTask, todoTasks } from '@/api/workbench'
 import type { TaskView } from '@/api/types'
-import { actionText } from '@/utils/labels'
+import { actionText, actionType } from '@/utils/labels'
 
 const route = useRoute()
 const router = useRouter()
@@ -88,10 +119,14 @@ async function load() {
   }
 }
 
-function onTab(name: number | string) {
-  router.replace({ name: name === 'todo' ? 'todo' : 'done' })
+function reload() {
   page.value = 1
   load()
+}
+
+function onTab(name: number | string) {
+  router.replace({ name: name === 'todo' ? 'todo' : 'done' })
+  reload()
 }
 
 function handle(row: TaskView, action: 'approve' | 'reject') {
@@ -118,9 +153,39 @@ function goDetail(instanceId: string) {
   router.push({ name: 'instance-detail', params: { instanceId } })
 }
 
+function goDetailRow(row: TaskView) {
+  goDetail(row.processInstanceId)
+}
+
+function fmt(value?: string) {
+  return value ? value.replace('T', ' ').slice(0, 19) : '-'
+}
+
+function duration(start?: string, end?: string) {
+  if (!start || !end) return '-'
+  const minutes = Math.max(0, Math.round((new Date(end.replace(' ', 'T')).getTime()
+    - new Date(start.replace(' ', 'T')).getTime()) / 60000))
+  if (minutes < 1) return '1 分钟内'
+  if (minutes < 60) return `${minutes} 分钟`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} 小时 ${minutes % 60} 分`
+  return `${Math.floor(hours / 24)} 天 ${hours % 24} 小时`
+}
+
 onMounted(load)
 </script>
 
 <style scoped>
-.toolbar { display: flex; align-items: center; margin-bottom: 8px; }
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #ebeef5;
+  margin-bottom: 12px;
+}
+.toolbar-tabs :deep(.el-tabs__header) { margin-bottom: 0; }
+.toolbar-right { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; }
+.pager { display: flex; justify-content: flex-end; margin-top: 14px; }
+:deep(.el-table__row) { cursor: pointer; }
 </style>
