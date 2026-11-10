@@ -135,12 +135,14 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | POST | `/org/depts` | 管理员新增/编辑部门（按 deptCode 幂等 upsert，与 /org/sync 语义一致） |
 | DELETE | `/org/depts/{deptCode}` | 删除部门（有下级或有人员时拒绝） |
 | POST | `/org/users` | 管理员新增/编辑人员（编辑时角色列表全量替换） |
-| DELETE | `/org/users/{userCode}` | 删除人员（被他人设为主管时拒绝，角色同步清除） |
+| DELETE | `/org/users/{userCode}` | 删除人员（被他人设为主管或任一部门主管时拒绝，角色同步清除） |
 | POST | `/org/roles/{roleCode}/assign` | 角色人员全量分配（diff 增删映射，实时影响审批人解析） |
 | GET | `/instances` | 管理员视角：本租户全部实例分页（flowCode/status/keyword 过滤，keyword 匹配标题或发起人） |
 | GET | `/dashboard/stats` | 管理员数据看板：通过率、平均审批时长、近 14 天发起/办结趋势、流程 TOP5 |
 
 时间序列化：`LocalDateTime` 全局输出 `yyyy-MM-dd HH:mm:ss`（JacksonConfig，Jackson 3 + Boot 4.1）；反序列化兼容 `T` 与空格分隔。
+
+主管继承规则：「直属主管」类审批节点解析时，人员显式设置的 leaderCode 优先；未设置时自动继承所在部门的主管（本部门未设则沿上级部门逐级向上查找第一个配置了主管的部门），部门主管是本人时跳过本级继续向上，避免自审批。仅跨部门汇报线需要显式指定直属主管。
 | GET | `/tenant/info` | 当前租户信息 |
 | GET/POST | `/tenant/credentials` | 凭证列表（Secret 掩码）/ 新建（Secret 仅此一次完整返回） |
 | GET/POST | `/platform/tenants` | 平台管理员：租户列表（含账号/凭证/流程/实例统计）/ 新建租户（可带初始管理员） |

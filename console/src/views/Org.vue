@@ -27,8 +27,14 @@
           <el-table-column prop="title" label="职位" width="110">
             <template #default="{ row }">{{ row.title || '-' }}</template>
           </el-table-column>
-          <el-table-column prop="leaderCode" label="直属主管" width="100">
-            <template #default="{ row }">{{ leaderName(row.leaderCode) }}</template>
+          <el-table-column prop="leaderCode" label="直属主管" min-width="130">
+            <template #default="{ row }">
+              <template v-if="effectiveLeaderOf(row)">
+                {{ effectiveLeaderOf(row)!.name }}
+                <el-tag v-if="!row.leaderCode" size="small" type="info" effect="plain" round>部门</el-tag>
+              </template>
+              <span v-else>-</span>
+            </template>
           </el-table-column>
           <el-table-column prop="mobile" label="手机号" width="125">
             <template #default="{ row }">{{ row.mobile || '-' }}</template>
@@ -68,7 +74,7 @@
       <!-- 部门 -->
       <el-tab-pane label="部门" name="depts">
         <div class="toolbar">
-          <span class="tab-tip">部门主管与直属主管关系用于审批人解析（直属主管 / 部门主管类型节点）</span>
+          <span class="tab-tip">部门主管会自动作为部门内未单独设置主管的人员的直属主管（本部门未设则沿上级部门向上查找）；「直属主管 / 部门主管」类型审批节点均按此解析</span>
           <el-button type="primary" @click="openDeptDialog()">新增部门</el-button>
         </div>
         <el-table :data="depts" v-loading="deptsLoading">
@@ -130,10 +136,11 @@
           </el-select>
         </el-form-item>
         <el-form-item label="直属主管">
-          <el-select v-model="userForm.leaderCode" placeholder="选择人员" clearable filterable style="width: 100%">
+          <el-select v-model="userForm.leaderCode" :placeholder="deptLeaderHint || '留空默认取部门主管'" clearable filterable style="width: 100%">
             <el-option v-for="u in allUsers" :key="u.userCode" :label="`${u.name}(${u.userCode})`"
                        :value="u.userCode" :disabled="u.userCode === userForm.userCode" />
           </el-select>
+          <div class="field-tip">不选时自动继承所在部门的主管（部门未设则沿上级部门向上查找）；仅跨部门汇报线需要显式指定</div>
         </el-form-item>
         <el-form-item label="职位">
           <el-input v-model="userForm.title" maxlength="64" />
@@ -207,7 +214,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import {
@@ -261,6 +268,35 @@ function leaderName(code?: string) {
   if (!code) return '-'
   return nameByCode.get(code) ? `${nameByCode.get(code)}(${code})` : code
 }
+
+/** 沿部门树向上找第一个配置了主管的部门（与后端 deptLeaderAbove 语义一致，excludeUserCode 避免自己审批自己） */
+function deptLeaderAbove(deptCode?: string, excludeUserCode?: string): string | undefined {
+  let current = deptCode
+  const visited = new Set<string>()
+  while (current && !visited.has(current)) {
+    visited.add(current)
+    const dept = depts.value.find((d) => d.deptCode === current)
+    if (!dept) break
+    if (dept.leaderId && dept.leaderId !== excludeUserCode) return dept.leaderId
+    current = dept.parentCode
+  }
+  return undefined
+}
+
+/** 人员的生效直属主管：显式 leaderCode 优先，否则部门主管兜底 */
+function effectiveLeaderOf(row: OrgUserView): { code: string; name: string } | undefined {
+  const code = row.leaderCode || deptLeaderAbove(row.deptCode, row.userCode)
+  if (!code) return undefined
+  return { code, name: leaderName(code) }
+}
+
+/** 人员表单中「直属主管」的动态提示：显示当前所选部门的兜底主管 */
+const deptLeaderHint = computed(() => {
+  if (!userForm.deptCode) return ''
+  const leader = deptLeaderAbove(userForm.deptCode, userForm.userCode)
+  if (!leader) return ''
+  return `留空默认取部门主管：${leaderName(leader)}`
+})
 
 function deptName(code?: string) {
   if (!code) return '-'
@@ -445,5 +481,6 @@ onMounted(() => {
 }
 .filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tab-tip { font-size: 12px; color: #8a919f; }
+.field-tip { font-size: 12px; color: #8a919f; line-height: 1.4; margin-top: 2px; }
 .pager { display: flex; justify-content: flex-end; margin-top: 12px; }
 </style>

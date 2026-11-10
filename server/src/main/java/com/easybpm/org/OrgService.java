@@ -46,17 +46,59 @@ public class OrgService {
 
     /**
      * 沿直属主管链向上取第 level 级主管。
+     *
+     * <p>直属主管关系：人员显式设置的 leaderCode 优先；未设置时继承所在部门的
+     * 主管（部门也没设则沿父部门逐级向上找第一个配置了主管的部门），
+     * 因此「人员选了部门」即天然拥有部门主管作为直属主管，无需逐人重复维护。
      */
     public String findLeader(String userCode, int level) {
         String current = userCode;
         for (int i = 0; i < Math.max(level, 1); i++) {
-            OrgUser user = findUser(current);
-            if (user == null || user.getLeaderCode() == null || user.getLeaderCode().isBlank()) {
+            String next = directLeaderOf(current);
+            if (next == null) {
                 return null;
             }
-            current = user.getLeaderCode();
+            current = next;
         }
         return current;
+    }
+
+    /** 人员的直属主管：显式 leaderCode 优先，否则继承部门主管（含父部门向上追溯）。 */
+    private String directLeaderOf(String userCode) {
+        OrgUser user = findUser(userCode);
+        if (user == null) {
+            return null;
+        }
+        if (user.getLeaderCode() != null && !user.getLeaderCode().isBlank()) {
+            return user.getLeaderCode();
+        }
+        return deptLeaderAbove(user.getDeptCode(), userCode);
+    }
+
+    /**
+     * 沿部门树向上找第一个配置了主管的部门。excludeUserCode 用于部门主管是本人时
+     * 跳过本级继续向上，避免「自己审批自己」。visited 防部门树数据成环。
+     */
+    private String deptLeaderAbove(String deptCode, String excludeUserCode) {
+        String current = deptCode;
+        Set<String> visited = new LinkedHashSet<>();
+        while (current != null && !current.isBlank() && visited.add(current)) {
+            OrgDept dept = findDept(current);
+            if (dept == null) {
+                break;
+            }
+            String leader = dept.getLeaderId();
+            if (leader != null && !leader.isBlank() && !leader.equals(excludeUserCode)) {
+                return leader;
+            }
+            current = dept.getParentCode();
+        }
+        return null;
+    }
+
+    /** 人员的直属主管（展示/校验用）：与审批解析同源，显式优先，否则部门主管兜底。 */
+    public String effectiveLeader(String userCode) {
+        return directLeaderOf(userCode);
     }
 
     public List<String> findUsersByRole(String roleCode) {
