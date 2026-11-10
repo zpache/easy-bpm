@@ -15,10 +15,9 @@
       <el-table-column prop="version" label="版本" width="70" />
       <el-table-column prop="description" label="描述" min-width="180" show-overflow-tooltip />
       <el-table-column prop="updatedAt" label="更新时间" width="180" />
-      <el-table-column label="操作" width="230" fixed="right">
+      <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="goDesign(row)">设计审批链</el-button>
-          <el-button link @click="goVersions(row)">版本历史</el-button>
           <template v-if="auth.isTenantAdmin">
             <el-button v-if="row.status === 'PUBLISHED'" link type="warning" @click="onDisable(row)">停用</el-button>
             <el-button v-else-if="row.status === 'DISABLED'" link type="success" @click="onEnable(row)">启用</el-button>
@@ -115,9 +114,13 @@ async function onDisable(row: FlowDefinition) {
 }
 
 async function onEnable(row: FlowDefinition) {
-  await ElMessageBox.confirm(`确认启用「${row.name}」？将恢复到其最后一次发布的版本 v${row.version}`, '启用', { type: 'info' })
+  const neverPublished = !row.version
+  const message = neverPublished
+    ? `「${row.name}」从未发布过，启用后将恢复为草稿状态，需进入设计页完成发布`
+    : `确认启用「${row.name}」？将恢复到其最后一次发布的版本 v${row.version}`
+  await ElMessageBox.confirm(message, '启用', { type: 'info' })
   await enableFlow(row.code)
-  ElMessage.success('已启用')
+  ElMessage.success(neverPublished ? '已恢复为草稿，请进入设计页发布' : '已启用')
   await load()
 }
 
@@ -130,10 +133,6 @@ async function onDelete(row: FlowDefinition) {
 
 function goDesign(row: FlowDefinition) {
   router.push({ name: 'flow-design', params: { code: row.code } })
-}
-
-function goVersions(row: FlowDefinition) {
-  router.push({ name: 'flow-versions', params: { code: row.code } })
 }
 
 onMounted(load)

@@ -178,6 +178,7 @@ public class FlowDefinitionService {
 
     /**
      * 启用已停用的流程：恢复到其最后一次发布的版本，无需重新走发布流程。
+     * 从未发布过的流程（历史上被误停用的草稿）启用时恢复为草稿状态。
      */
     @Transactional
     public FlowDefinition enable(String code, String operator) {
@@ -185,12 +186,21 @@ public class FlowDefinitionService {
         if (!"DISABLED".equals(definition.getStatus())) {
             throw BizException.badRequest("仅已停用的流程可启用（code=" + code + "）");
         }
+        LocalDateTime now = LocalDateTime.now();
         if (definition.getProcessDefinitionId() == null) {
-            throw new BizException(ErrorCode.FLOW_SCHEMA_INVALID, "流程缺少引擎部署记录，无法启用，请重新发布");
+            if (definition.getVersion() != null && definition.getVersion() > 0) {
+                throw new BizException(ErrorCode.FLOW_SCHEMA_INVALID, "流程缺少引擎部署记录，无法启用，请重新发布");
+            }
+            // 从未发布过：恢复为草稿，走正常发布流程
+            definition.setStatus("DRAFT");
+            definition.setUpdatedBy(operator);
+            definition.setUpdatedAt(now);
+            definitionMapper.updateById(definition);
+            return definition;
         }
         definition.setStatus("PUBLISHED");
         definition.setUpdatedBy(operator);
-        definition.setUpdatedAt(LocalDateTime.now());
+        definition.setUpdatedAt(now);
         definitionMapper.updateById(definition);
         return definition;
     }
