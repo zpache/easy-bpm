@@ -11,6 +11,7 @@ import com.easybpm.flow.FlowDefinition;
 import com.easybpm.flow.FlowDefinitionService;
 import com.easybpm.flow.FlowNode;
 import com.easybpm.flow.FlowSchema;
+import com.easybpm.flow.EmptyStrategy;
 import com.easybpm.flow.FormValidator;
 import com.easybpm.flow.NodeType;
 import com.easybpm.flow.RejectStrategy;
@@ -39,6 +40,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * 审批引擎门面。
@@ -125,7 +127,8 @@ public class FlowEngineService {
                 ? definition.getName() + " - " + command.initiatorName()
                 : command.title();
 
-        Map<String, Object> variables = resolveVariables(definition, schema, command, title);
+        ResolvedFlow resolved = resolveVariables(definition, schema, command, title);
+        Map<String, Object> variables = resolved.variables();
 
         ProcessInstance processInstance;
         try {
@@ -160,6 +163,8 @@ public class FlowEngineService {
         insertRecord(processInstance.getId(), null, null, "发起审批", command.initiatorId(),
                 command.initiatorName(), TaskAction.SUBMIT, null);
 
+        autoRun(processInstance.getId(), resolved);
+
         ActionResult current = syncProgress(processInstance.getId(), false);
         return new StartResult(processInstance.getId(), current.status(),
                 current.currentNodeName(), pendingTasks(processInstance.getId()));
@@ -193,7 +198,8 @@ public class FlowEngineService {
                 projection.getTitle(), projection.getInitiatorId(), projection.getInitiatorName(),
                 projection.getInitiatorDeptCode(), merged, List.of(), projection.getCallbackUrl(), null);
         String title = projection.getTitle();
-        Map<String, Object> variables = resolveVariables(definition, schema, command, title);
+        ResolvedFlow resolved = resolveVariables(definition, schema, command, title);
+        Map<String, Object> variables = resolved.variables();
 
         ProcessInstance newProcess;
         try {
@@ -211,6 +217,8 @@ public class FlowEngineService {
 
         insertRecord(projection.getInstanceId(), null, null, "重新提交", userId,
                 displayName(userId), TaskAction.RESUBMIT, comment);
+
+        autoRun(newProcess.getId(), resolved);
 
         ActionResult current = syncProgress(newProcess.getId(), false);
         return new StartResult(projection.getInstanceId(), current.status(),
@@ -383,8 +391,17 @@ public class FlowEngineService {
     }
 
     /** 发起变量解析：条件求值、审批人解析、抄送人合并。发起与重提共用。 */
-    private Map<String, Object> resolveVariables(FlowDefinition definition, FlowSchema schema,
-                                                 StartCommand command, String title) {
+    private record ResolvedFlow(Map<String, Object> variables, Set<String> autoPassNodes, Set<String> autoRejectNodes) {
+    }
+
+    /** 审批人为空兜底时占位的任务处理人，任务创建后随即由系统自动处理。 */
+    private static final String AUTO_ASSIGNEE = "__system_auto__";
+    private static final String AUTO_OPERATOR = "__system__";
+    private static final String AUTO_PASS_COMMENT = "审批人为空，按节点兜底策略自动通过";
+    private static final String AUTO_REJECT_COMMENT = "审批人为空，按节点兜底策略自动驳回";
+
+    private ResolvedFlow resolveVariables(FlowDefinition definition, FlowSchema schema,
+                                          StartCommand command, String title) {
         Map<String, Object> variables = new LinkedHashMap<>(command.formData());
         variables.put("initiatorId", command.initiatorId());
         variables.put("initiatorName", command.initiatorName());
@@ -393,6 +410,8 @@ public class FlowEngineService {
         }
         variables.put("instanceTitle", title);
 
+        Set<String> autoPassNodes = new LinkedHashSet<>();
+        Set<String> autoRejectNodes = new LinkedHashSet<>();
         List<FlowNode> nodes = schema.nodes().subList(1, schema.nodes().size() - 1);
         for (FlowNode node : nodes) {
             if (node.condition() != null && !node.condition().isBlank()) {
@@ -400,8 +419,15 @@ public class FlowEngineService {
             }
             if (node.type() == NodeType.APPROVAL) {
                 List<String> approvers = approverResolver.resolve(node, command, variables);
-                approverResolver.requireNotEmpty(approvers, node);
-                variables.put("ap_" + node.id(), approvers);
+                EmptyStrategy emptyStrategy = node.props().emptyOrDefault();
+                if (approvers.isEmpty() && emptyStrategy != EmptyStrategy.FAIL) {
+                    // 兜底：占位处理人让引擎创建任务，随后由 autoRun 按策略系统处理
+                    (emptyStrategy == EmptyStrategy.AUTO_PASS ? autoPassNodes : autoRejectNodes).add(node.id());
+                    variables.put("ap_" + node.id(), List.of(AUTO_ASSIGNEE));
+                } else {
+                    approverResolver.requireNotEmpty(approvers, node);
+                    variables.put("ap_" + node.id(), approvers);
+                }
                 variables.put("decision_" + node.id(), "PENDING");
             } else if (node.type() == NodeType.CC) {
                 List<String> ccUsers = new ArrayList<>(node.props().ccUsers());
@@ -409,7 +435,39 @@ public class FlowEngineService {
                 variables.put("cc_" + node.id(), new ArrayList<>(new LinkedHashSet<>(ccUsers)));
             }
         }
-        return new HashMap<>(variables);
+        return new ResolvedFlow(new HashMap<>(variables), autoPassNodes, autoRejectNodes);
+    }
+
+    /**
+     * 发起后自动执行兜底节点：审批人解析为空的 AUTO_PASS / AUTO_REJECT 节点，
+     * 以系统身份完成对应任务，写入时间线。循环处理以覆盖连续多个兜底节点的场景。
+     */
+    private void autoRun(String processInstanceId, ResolvedFlow resolved) {
+        if (resolved.autoPassNodes().isEmpty() && resolved.autoRejectNodes().isEmpty()) {
+            return;
+        }
+        String externalId = requireProjectionByEngine(processInstanceId).getInstanceId();
+        boolean rejected = false;
+        boolean progressed = true;
+        while (progressed && !rejected) {
+            progressed = false;
+            for (Task task : taskService.createTaskQuery().processInstanceId(processInstanceId).list()) {
+                String nodeId = task.getTaskDefinitionKey();
+                if (resolved.autoPassNodes().contains(nodeId)) {
+                    runtimeService.setVariable(processInstanceId, "decision_" + nodeId, "APPROVE");
+                    insertRecord(externalId, task.getId(), nodeId, task.getName(), AUTO_OPERATOR,
+                            "系统", TaskAction.APPROVE, AUTO_PASS_COMMENT);
+                    taskService.complete(task.getId());
+                    progressed = true;
+                } else if (resolved.autoRejectNodes().contains(nodeId)) {
+                    runtimeService.setVariable(processInstanceId, "decision_" + nodeId, "REJECT");
+                    insertRecord(externalId, task.getId(), nodeId, task.getName(), AUTO_OPERATOR,
+                            "系统", TaskAction.REJECT, AUTO_REJECT_COMMENT);
+                    taskService.complete(task.getId());
+                    rejected = true;
+                }
+            }
+        }
     }
 
     private Task requireActiveTask(String taskId, String userId) {
@@ -574,7 +632,11 @@ public class FlowEngineService {
         for (FlowNode node : schema.nodes().subList(1, schema.nodes().size() - 1)) {
             if (node.type() == NodeType.APPROVAL
                     && (node.condition() == null || conditionEvaluator.evaluate(node.condition(), variables, node.name()))) {
-                approverResolver.requireNotEmpty(approverResolver.resolve(node, command, variables), node);
+                List<String> approvers = approverResolver.resolve(node, command, variables);
+                // 配置了自动通过/自动驳回兜底的节点，审批人为空不算发起阻塞
+                if (!approvers.isEmpty() || node.props().emptyOrDefault() != EmptyStrategy.FAIL) {
+                    approverResolver.requireNotEmpty(approvers, node);
+                }
             }
         }
     }

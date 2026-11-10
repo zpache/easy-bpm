@@ -23,6 +23,8 @@
           <div v-if="node.type === 'APPROVAL' && node.props" class="node-props">
             {{ approverText(node.props) }} · {{ node.props.mode === 'ALL' ? '会签' : '或签' }}
             <template v-if="node.props.rejectStrategy === 'TO_START'"> · 驳回退回发起人</template>
+            <template v-if="node.props.emptyStrategy === 'AUTO_PASS'"> · 空时自动通过</template>
+            <template v-else-if="node.props.emptyStrategy === 'AUTO_REJECT'"> · 空时自动驳回</template>
           </div>
           <div v-if="node.type === 'CC' && node.props" class="node-props">
             抄送给：{{ ccText(node.props) }}
@@ -100,6 +102,14 @@
               <el-option label="退回发起人重提" value="TO_START" />
             </el-select>
           </el-form-item>
+          <el-form-item label="审批人为空时">
+            <el-select v-model="editing.props!.emptyStrategy">
+              <el-option label="拦截发起（默认）" value="FAIL" />
+              <el-option label="自动通过" value="AUTO_PASS" />
+              <el-option label="自动驳回" value="AUTO_REJECT" />
+            </el-select>
+            <div class="field-hint">审批人全部被停用或匹配不到时的兜底动作</div>
+          </el-form-item>
         </template>
         <el-button type="danger" plain style="width: 100%" @click="removeNode">删除该节点</el-button>
       </el-form>
@@ -124,6 +134,7 @@ interface NodeProps {
   formFieldKey?: string
   mode?: string
   rejectStrategy?: string
+  emptyStrategy?: string
   ccUsers?: string | string[]
 }
 
@@ -156,7 +167,7 @@ function openNodeEdit(index: number) {
   if (!canEditNode(node)) return
   // 属性缺省值补齐，保证抽屉表单可完整编辑
   if (node.type === 'APPROVAL') {
-    node.props = { approverType: 'INITIATOR_LEADER', leaderLevel: 1, mode: 'ANY', rejectStrategy: 'TO_END', ...node.props }
+    node.props = { approverType: 'INITIATOR_LEADER', leaderLevel: 1, mode: 'ANY', rejectStrategy: 'TO_END', emptyStrategy: 'FAIL', ...node.props }
   } else if (node.type === 'CC') {
     node.props = { ccUsers: '', ...node.props }
   }
@@ -342,6 +353,9 @@ function serializeNode(node: FlowNode): Record<string, unknown> {
       mode: node.props.mode,
       rejectStrategy: node.props.rejectStrategy,
     }
+    if (node.props.emptyStrategy && node.props.emptyStrategy !== 'FAIL') {
+      props.emptyStrategy = node.props.emptyStrategy
+    }
     if (node.props.leaderLevel != null) props.leaderLevel = node.props.leaderLevel
     if (node.props.specifiedUsers) {
       props.specifiedUsers = splitList(node.props.specifiedUsers)
@@ -408,4 +422,5 @@ onMounted(async () => {
 .connector .head { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #c8ccd4; }
 .connector .insert-btn { margin: 0; font-weight: 600; color: #0960bd; border-color: #bcd4ee; }
 .connector .insert-btn:hover { background: #ecf3fb; }
+.field-hint { font-size: 12px; color: #909399; line-height: 1.5; margin-top: 4px; }
 </style>
