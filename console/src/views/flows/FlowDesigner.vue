@@ -59,7 +59,11 @@
             <el-input-number v-model="editing.props!.leaderLevel" :min="1" :max="5" />
           </el-form-item>
           <el-form-item v-if="editing.props!.approverType === 'SPECIFIED'" label="指定人员">
-            <el-input v-model="editing.props!.specifiedUsers" placeholder="逗号分隔 userCode" />
+            <el-select v-model="specifiedUsersInput" multiple filterable allow-create
+                       default-first-option placeholder="从组织架构选择，或输入 userCode" style="width: 100%">
+              <el-option v-for="u in userOptions" :key="u.userCode"
+                         :label="`${u.name}（${u.userCode}）`" :value="u.userCode" />
+            </el-select>
           </el-form-item>
           <el-form-item v-if="editing.props!.approverType === 'ROLE'" label="角色编码">
             <el-input v-model="editing.props!.roleCodes" placeholder="逗号分隔角色编码" />
@@ -91,7 +95,9 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchFlow, publishFlow, saveFlow } from '@/api/flows'
+import { orgUsers } from '@/api/org'
 import { useAuthStore } from '@/stores/auth'
+import type { OrgUserView } from '@/api/types'
 
 interface NodeProps {
   approverType?: string
@@ -173,6 +179,20 @@ const ccUsersInput = computed({
   },
   set: (input: string) => {
     if (editing.value?.props) editing.value.props.ccUsers = input
+  },
+})
+
+// 组织架构人员选项，供「指定人员」下拉选择
+const userOptions = ref<OrgUserView[]>([])
+
+const specifiedUsersInput = computed({
+  get: () => {
+    const value = editing.value?.props?.specifiedUsers
+    if (Array.isArray(value)) return value
+    return value ? value.split(/[,，\s]+/).filter(Boolean) : []
+  },
+  set: (list: string[]) => {
+    if (editing.value?.props) editing.value.props.specifiedUsers = list
   },
 })
 
@@ -295,7 +315,12 @@ function splitList(value: string | string[]): string[] {
 }
 
 onMounted(async () => {
-  flow.value = await fetchFlow(code.value)
+  const [loaded, users] = await Promise.all([
+    fetchFlow(code.value),
+    orgUsers({ page: 1, size: 500 }).catch(() => null),
+  ])
+  flow.value = loaded
+  userOptions.value = users?.list ?? []
   const schema = flow.value.flowSchema as { nodes?: FlowNode[] } | null
   const list = schema?.nodes ?? []
   // 编辑态归一化：数组形式的抄送人转为逗号分隔字符串
