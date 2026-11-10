@@ -196,6 +196,8 @@ public class ConsolePlatformController {
         AuthPrincipal principal = CurrentUser.require();
         AuthPrincipal switched = new AuthPrincipal(principal.consoleUserId(), tenant.getId(),
                 principal.displayName(), "PLATFORM_ADMIN", null);
+        audit.record("TENANT_SWITCH", "TENANT", tenant.getId(),
+                "切换进入租户「" + tenant.getName() + "」(" + tenant.getCode() + ")，以平台管理员身份操作");
         return ApiResponse.ok(new SwitchResult(jwtService.issue(switched), jwtService.ttlSeconds(),
                 tenant.getCode(), tenant.getName(), principal.displayName()));
     }
