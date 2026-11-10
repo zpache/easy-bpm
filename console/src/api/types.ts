@@ -14,9 +14,9 @@ export interface PageResult<T> {
 }
 
 export interface LoginUser {
-  username: string
-  name: string
-  role: string
+  username?: string
+  name?: string
+  role?: string
   userCode?: string
 }
 
@@ -146,6 +146,27 @@ export interface TenantInfo {
   status: string
   remark?: string
   createdAt?: string
+}
+
+export interface PlatformTenantView {
+  id: string
+  code: string
+  name: string
+  status: string
+  remark?: string
+  consoleUserCount?: number
+  credentialCount?: number
+  publishedFlowCount?: number
+  runningInstanceCount?: number
+  createdAt?: string
+}
+
+export interface PlatformTenantSwitch {
+  token: string
+  expiresIn: number
+  tenantCode: string
+  tenantName: string
+  displayName?: string
 }
 
 export interface TenantCredentialView {

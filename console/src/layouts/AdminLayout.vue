@@ -23,6 +23,10 @@
           <el-icon><Odometer /></el-icon>
           <template #title>仪表盘</template>
         </el-menu-item>
+        <el-menu-item v-if="auth.isPlatformAdmin" index="/platform">
+          <el-icon><Platform /></el-icon>
+          <template #title>平台管理</template>
+        </el-menu-item>
         <el-menu-item index="/flows">
           <el-icon><Share /></el-icon>
           <template #title>流程定义</template>
@@ -75,11 +79,21 @@
           </el-breadcrumb>
         </div>
         <div class="header-right">
+          <el-tooltip
+            v-if="auth.switchedTenant"
+            content="点击返回平台管理视角"
+            placement="bottom"
+          >
+            <el-tag size="large" type="warning" effect="dark" round class="switching-tag" @click="onBackToPlatform">
+              管理中：{{ auth.switchedTenant.name }}
+            </el-tag>
+          </el-tooltip>
           <el-dropdown trigger="click">
             <div class="user-chip">
               <el-avatar :size="30" class="user-avatar">{{ avatarChar }}</el-avatar>
               <span class="user-name">{{ auth.user?.name || auth.user?.username }}</span>
-              <el-tag v-if="auth.isTenantAdmin" size="small" type="warning" effect="light" round>管理员</el-tag>
+              <el-tag v-if="auth.isPlatformAdmin" size="small" type="danger" effect="light" round>平台管理员</el-tag>
+              <el-tag v-else-if="auth.isTenantAdmin" size="small" type="warning" effect="light" round>管理员</el-tag>
               <el-icon class="user-arrow"><ArrowDown /></el-icon>
             </div>
             <template #dropdown>
@@ -119,6 +133,7 @@ import {
   Message,
   Odometer,
   OfficeBuilding,
+  Platform,
   Promotion,
   Share,
   SwitchButton,
@@ -150,6 +165,11 @@ const avatarChar = computed(() => (auth.user?.name || auth.user?.username || 'U'
 async function onLogout() {
   await auth.logout()
   router.push({ name: 'login' })
+}
+
+function onBackToPlatform() {
+  auth.exitTenant()
+  router.push('/platform')
 }
 </script>
 
@@ -282,6 +302,7 @@ async function onLogout() {
 }
 .user-name { font-size: 14px; color: #1f2937; font-weight: 500; }
 .user-arrow { color: #909399; font-size: 12px; }
+.switching-tag { cursor: pointer; margin-right: 12px; font-weight: 600; }
 
 /* ---------- 内容区 ---------- */
 .main {

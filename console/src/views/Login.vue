@@ -35,7 +35,7 @@
           <p class="form-sub">easy-bpm 控制台</p>
           <el-form :model="form" size="large" @keyup.enter="onSubmit">
             <el-form-item>
-              <el-input v-model="form.tenantCode" placeholder="租户编码（demo）" clearable>
+              <el-input v-model="form.tenantCode" placeholder="租户编码（demo / platform）" clearable>
                 <template #prefix><el-icon><OfficeBuilding /></el-icon></template>
               </el-input>
             </el-form-item>

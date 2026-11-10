@@ -11,6 +11,7 @@ export const router = createRouter({
       children: [
         { path: '', redirect: '/dashboard' },
         { path: 'dashboard', name: 'dashboard', component: () => import('@/views/Dashboard.vue'), meta: { title: '仪表盘' } },
+        { path: 'platform', name: 'platform', component: () => import('@/views/Platform.vue'), meta: { title: '平台管理', requiresPlatformAdmin: true } },
         { path: 'flows', name: 'flows', component: () => import('@/views/flows/FlowList.vue'), meta: { title: '流程定义' } },
         { path: 'flows/:code/versions', name: 'flow-versions', component: () => import('@/views/flows/FlowVersions.vue'), meta: { title: '版本历史' } },
         { path: 'flows/:code/design', name: 'flow-design', component: () => import('@/views/flows/FlowDesigner.vue'), meta: { title: '审批流程设计' } },
@@ -36,6 +37,9 @@ router.beforeEach((to) => {
     return { name: 'dashboard' }
   }
   if (to.matched.some((r) => r.meta.requiresAdmin) && !auth.isTenantAdmin) {
+    return { name: 'dashboard' }
+  }
+  if (to.matched.some((r) => r.meta.requiresPlatformAdmin) && !auth.isPlatformAdmin) {
     return { name: 'dashboard' }
   }
   return true
