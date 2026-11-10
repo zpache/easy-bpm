@@ -47,6 +47,10 @@
           <el-icon><Message /></el-icon>
           <template #title>抄送我的</template>
         </el-menu-item>
+        <el-menu-item v-if="auth.isTenantAdmin" index="/workbench/all-instances">
+          <el-icon><Files /></el-icon>
+          <template #title>全部实例</template>
+        </el-menu-item>
         <template v-if="auth.isTenantAdmin">
           <el-menu-item index="/org">
             <el-icon><OfficeBuilding /></el-icon>
@@ -126,6 +130,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowDown,
   Expand,
+  Files,
   Finished,
   Fold,
   Key,

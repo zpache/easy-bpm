@@ -60,3 +60,30 @@ export function rejectTask(taskId: string, comment: string) {
 export function dashboardSummary() {
   return http.get<never, Record<string, number>>('/api/dashboard/summary')
 }
+
+export interface DashboardTrendPoint {
+  day: string
+  started: number
+  finished: number
+}
+
+export interface DashboardFlowStat {
+  flowCode: string
+  flowName: string
+  count: number
+}
+
+export interface DashboardStats {
+  approvalRate: number
+  avgApprovalHours: number
+  trend: DashboardTrendPoint[]
+  topFlows: DashboardFlowStat[]
+}
+
+export function dashboardStats() {
+  return http.get<never, DashboardStats>('/api/dashboard/stats')
+}
+
+export function allInstances(params: PageParams) {
+  return http.get<never, PageResult<InstanceView>>('/api/instances', { params: toQuery(params) })
+}

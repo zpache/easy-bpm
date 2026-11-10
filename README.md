@@ -131,6 +131,8 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | GET | `/workbench/counts` | 待办/已办/已提交/未读抄送数量 |
 | POST | `/workbench/tasks/{taskId}/approve\|reject` | 控制台审批（身份取登录账号绑定人员） |
 | GET | `/org/depts\|users\|roles` | 组织数据只读查询（写入走 OpenAPI /org/sync） |
+| GET | `/instances` | 管理员视角：本租户全部实例分页（flowCode/status/keyword 过滤，keyword 匹配标题或发起人） |
+| GET | `/dashboard/stats` | 管理员数据看板：通过率、平均审批时长、近 14 天发起/办结趋势、流程 TOP5 |
 | GET | `/tenant/info` | 当前租户信息 |
 | GET/POST | `/tenant/credentials` | 凭证列表（Secret 掩码）/ 新建（Secret 仅此一次完整返回） |
 | GET/POST | `/platform/tenants` | 平台管理员：租户列表（含账号/凭证/流程/实例统计）/ 新建租户（可带初始管理员） |
