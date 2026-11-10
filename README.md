@@ -125,6 +125,11 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | GET | `/workbench/todo\|done\|submitted` | 工作台三种列表 |
 | GET | `/workbench/counts` | 待办/已办/已提交数量 |
 | POST | `/workbench/tasks/{taskId}/approve\|reject` | 控制台审批（身份取登录账号绑定人员） |
+| GET | `/org/depts\|users\|roles` | 组织数据只读查询（写入走 OpenAPI /org/sync） |
+| GET | `/tenant/info` | 当前租户信息 |
+| GET/POST | `/tenant/credentials` | 凭证列表（Secret 掩码）/ 新建（Secret 仅此一次完整返回） |
+| POST | `/tenant/credentials/{id}/rotate` | 轮换 AppSecret（旧密钥立即失效，新密钥仅此一次返回） |
+| POST | `/tenant/credentials/{id}/disable` | 停用凭证 |
 | GET | `/dashboard/summary` | 首页统计 |
 
 ## P1 已验证场景
@@ -183,7 +188,7 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | P2 | 驳回到发起人（TO_START）、撤回、转交、重提、组织同步接口、索引与幂等顺序修复 | ✅ |
 | P3 后端 | 版本回滚、草稿删除、表单 schema 校验（required/type） | ✅ 后端 |
 | P5 阶段一 | 控制台前端：登录、布局、仪表盘、流程列表/发布/停用/删除/版本回滚、审批链设计器（节点树+属性抽屉）、工作台待办/已办/我发起的、审批详情时间线 | ✅ |
-| P5 阶段二 | 设计器增强（抄送节点）、组织管理页、租户凭证页、详情页表单只读渲染 | 待做 |
+| P5 阶段二 | 设计器增强（抄送节点）、组织管理页、租户凭证页、详情页表单只读渲染 | ✅ |
 | P4 | Webhook 回调 + 重试、幂等强化、限流、审计日志 | 待做 |
 | P6 | Docker Compose、MySQL 初始化脚本、部署与运维文档 | 待做 |
 

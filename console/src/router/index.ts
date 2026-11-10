@@ -18,6 +18,8 @@ export const router = createRouter({
         { path: 'workbench/done', name: 'done', component: () => import('@/views/workbench/TaskList.vue'), meta: { title: '已办', tab: 'done' } },
         { path: 'workbench/submitted', name: 'submitted', component: () => import('@/views/workbench/SubmittedList.vue'), meta: { title: '我发起的' } },
         { path: 'instances/:instanceId', name: 'instance-detail', component: () => import('@/views/workbench/InstanceDetail.vue'), meta: { title: '审批详情' } },
+        { path: 'org', name: 'org', component: () => import('@/views/Org.vue'), meta: { title: '组织管理', requiresAdmin: true } },
+        { path: 'tenant', name: 'tenant', component: () => import('@/views/Tenant.vue'), meta: { title: '租户凭证', requiresAdmin: true } },
       ],
     },
   ],
@@ -29,6 +31,9 @@ router.beforeEach((to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (to.name === 'login' && auth.loggedIn) {
+    return { name: 'dashboard' }
+  }
+  if (to.matched.some((r) => r.meta.requiresAdmin) && !auth.isTenantAdmin) {
     return { name: 'dashboard' }
   }
   return true
