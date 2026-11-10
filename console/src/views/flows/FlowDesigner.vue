@@ -2,7 +2,7 @@
   <el-card>
     <div class="toolbar">
       <el-button @click="router.push({ name: 'flows' })">返回</el-button>
-      <span class="flow-title">{{ flow?.name }}（{{ code }}）· 审批链设计</span>
+      <span class="flow-title">{{ flow?.name }}（{{ code }}）· 审批流程设计</span>
       <span style="flex: 1" />
       <el-button v-if="auth.isTenantAdmin" :disabled="flow?.status === 'DISABLED'" @click="addApprovalNode">+ 审批节点</el-button>
       <el-button v-if="auth.isTenantAdmin" :disabled="flow?.status === 'DISABLED'" @click="addCcNode">+ 抄送节点</el-button>
