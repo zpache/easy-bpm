@@ -11,8 +11,8 @@
       <el-descriptions-item label="发起人">{{ detail.instance.initiatorName }}</el-descriptions-item>
       <el-descriptions-item label="业务主键">{{ detail.instance.businessKey || '-' }}</el-descriptions-item>
       <el-descriptions-item label="当前节点">{{ detail.instance.currentNodeName || '-' }}</el-descriptions-item>
-      <el-descriptions-item label="发起时间">{{ detail.instance.startedAt }}</el-descriptions-item>
-      <el-descriptions-item label="结束时间">{{ detail.instance.endedAt || '-' }}</el-descriptions-item>
+      <el-descriptions-item label="发起时间">{{ fmtDateTime(detail.instance.startedAt) }}</el-descriptions-item>
+      <el-descriptions-item label="结束时间">{{ fmtDateTime(detail.instance.endedAt) }}</el-descriptions-item>
     </el-descriptions>
 
     <el-card shadow="never" style="margin-top: 16px">
@@ -22,7 +22,7 @@
           v-for="(item, index) in detail.timeline"
           :key="index"
           :type="timelineType(item.action)"
-          :timestamp="item.createdAt"
+          :timestamp="fmtDateTime(item.createdAt)"
         >
           <div class="tl-head">
             <el-tag size="small" :type="item.action === 'REJECT' ? 'danger' : item.action === 'APPROVE' ? 'success' : 'primary'">
@@ -65,6 +65,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { instanceDetail } from '@/api/workbench'
+import { fmtDateTime } from '@/utils/format'
 import type { InstanceDetail } from '@/api/types'
 import { actionText, actionType, statusText, statusType } from '@/utils/labels'
 

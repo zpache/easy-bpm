@@ -37,12 +37,14 @@
           </template>
         </el-table-column>
         <el-table-column prop="lastUsedAt" label="最近使用" width="180">
-          <template #default="{ row }">{{ row.lastUsedAt || '从未使用' }}</template>
+          <template #default="{ row }">{{ row.lastUsedAt ? fmtDateTime(row.lastUsedAt) : '从未使用' }}</template>
         </el-table-column>
         <el-table-column prop="expireAt" label="过期时间" width="180">
-          <template #default="{ row }">{{ row.expireAt || '不过期' }}</template>
+          <template #default="{ row }">{{ row.expireAt ? fmtDateTime(row.expireAt) : '不过期' }}</template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" width="180" />
+        <el-table-column prop="createdAt" label="创建时间" width="180">
+          <template #default="{ row }">{{ fmtDateTime(row.createdAt) }}</template>
+        </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
             <el-popconfirm title="轮换后旧 AppSecret 立即失效，接入方需同步更新，确认？" width="260" @confirm="onRotate(row)">
@@ -102,6 +104,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createCredential, disableCredential, listCredentials, rotateCredential, tenantInfo } from '@/api/tenant'
+import { fmtDateTime } from '@/utils/format'
 import type { CredentialSecretView, TenantCredentialView, TenantInfo } from '@/api/types'
 
 const info = ref<TenantInfo | null>(null)

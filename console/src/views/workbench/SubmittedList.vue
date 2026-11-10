@@ -25,8 +25,12 @@
         </template>
       </el-table-column>
       <el-table-column prop="currentNodeName" label="当前节点" width="160" />
-      <el-table-column prop="startedAt" label="发起时间" width="180" />
-      <el-table-column prop="endedAt" label="结束时间" width="180" />
+      <el-table-column prop="startedAt" label="发起时间" width="180">
+        <template #default="{ row }">{{ fmtDateTime(row.startedAt) }}</template>
+      </el-table-column>
+      <el-table-column prop="endedAt" label="结束时间" width="180">
+        <template #default="{ row }">{{ fmtDateTime(row.endedAt) }}</template>
+      </el-table-column>
     </el-table>
     <el-pagination
       v-model:current-page="page"
@@ -43,6 +47,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { submittedInstances } from '@/api/workbench'
+import { fmtDateTime } from '@/utils/format'
 import type { InstanceView } from '@/api/types'
 import { statusText, statusType } from '@/utils/labels'
 

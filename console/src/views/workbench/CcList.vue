@@ -49,7 +49,7 @@
         </template>
       </el-table-column>
       <el-table-column prop="createdAt" label="抄送时间" width="165">
-        <template #default="{ row }">{{ fmt(row.createdAt) }}</template>
+        <template #default="{ row }">{{ fmtDateTime(row.createdAt) }}</template>
       </el-table-column>
       <el-table-column label="操作" width="150" fixed="right">
         <template #default="{ row }">
@@ -81,6 +81,7 @@ import { Refresh, Search } from '@element-plus/icons-vue'
 import { ccList, markCcRead, workbenchCounts } from '@/api/workbench'
 import type { CcView } from '@/api/types'
 import { statusText, statusType } from '@/utils/labels'
+import { fmtDateTime } from '@/utils/format'
 
 const router = useRouter()
 const tab = ref<'all' | 'unread'>('all')
@@ -142,10 +143,6 @@ async function markRead(row: CcView) {
 
 function goDetail(row: CcView) {
   router.push({ name: 'instance-detail', params: { instanceId: row.instanceId } })
-}
-
-function fmt(value?: string) {
-  return value ? value.replace('T', ' ').slice(0, 19) : '-'
 }
 
 onMounted(() => {

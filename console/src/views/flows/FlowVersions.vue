@@ -13,7 +13,9 @@
       </el-table-column>
       <el-table-column prop="changelog" label="发布说明" min-width="240" />
       <el-table-column prop="publishedBy" label="发布人" width="120" />
-      <el-table-column prop="publishedAt" label="发布时间" width="180" />
+      <el-table-column prop="publishedAt" label="发布时间" width="180">
+        <template #default="{ row }">{{ fmtDateTime(row.publishedAt) }}</template>
+      </el-table-column>
       <el-table-column prop="processDefinitionId" label="引擎定义ID" width="320" show-overflow-tooltip />
       <el-table-column label="操作" width="120">
         <template #default="{ row }">
@@ -33,6 +35,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchFlow, listVersions, rollbackFlow } from '@/api/flows'
+import { fmtDateTime } from '@/utils/format'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
