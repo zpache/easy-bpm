@@ -6,7 +6,8 @@
       <span style="flex: 1" />
       <el-button v-if="auth.isTenantAdmin" :disabled="flow?.status === 'DISABLED'" @click="addApprovalNode">+ 审批节点</el-button>
       <el-button v-if="auth.isTenantAdmin" :disabled="flow?.status === 'DISABLED'" @click="addCcNode">+ 抄送节点</el-button>
-      <el-button v-if="auth.isTenantAdmin" type="primary" :disabled="flow?.status === 'DISABLED'" @click="onSave">保存草稿</el-button>
+      <el-button v-if="auth.isTenantAdmin" :disabled="flow?.status === 'DISABLED'" @click="onSave">保存草稿</el-button>
+      <el-button v-if="auth.isTenantAdmin" type="success" :disabled="flow?.status === 'DISABLED'" :loading="publishing" @click="onPublish">发布</el-button>
     </div>
 
     <el-alert v-if="flow?.status === 'DISABLED'" type="warning" :closable="false" style="margin-bottom: 12px">
@@ -88,8 +89,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { fetchFlow, saveFlow } from '@/api/flows'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { fetchFlow, publishFlow, saveFlow } from '@/api/flows'
 import { useAuthStore } from '@/stores/auth'
 
 interface NodeProps {
@@ -196,12 +197,12 @@ function removeNode() {
   selectedIndex.value = -1
 }
 
-async function onSave() {
-  if (!flow.value) return
+async function saveDraft(): Promise<boolean> {
+  if (!flow.value) return false
   const emptyCc = nodes.value.find((n) => n.type === 'CC' && !splitList(n.props?.ccUsers ?? '').length)
   if (emptyCc) {
     ElMessage.warning(`抄送节点「${emptyCc.name}」未配置抄送人`)
-    return
+    return false
   }
   await saveFlow({
     code: flow.value.code,
@@ -212,7 +213,33 @@ async function onSave() {
     formSchema: flow.value.formSchema ?? undefined,
     flowSchema: { nodes: nodes.value.map((n) => serializeNode(n)) },
   })
-  ElMessage.success('已保存为草稿，发布后生效')
+  return true
+}
+
+async function onSave() {
+  if (await saveDraft()) ElMessage.success('已保存为草稿，发布后生效')
+}
+
+const publishing = ref(false)
+
+async function onPublish() {
+  publishing.value = true
+  try {
+    if (!(await saveDraft())) return
+    const { value } = await ElMessageBox.prompt('发布说明（可选）', `发布 ${flow.value?.name ?? ''}`, {
+      inputPlaceholder: '本次发布改了什么',
+      confirmButtonText: '确认发布',
+      cancelButtonText: '仅保留草稿',
+    })
+    await publishFlow(code.value, value || undefined)
+    ElMessage.success('发布成功，新审批即刻按新版本流转')
+    flow.value = await fetchFlow(code.value)
+  } catch (e) {
+    // 取消发布弹窗（reject 为字符串）：草稿已保存，不算错误；真正的接口异常照常抛出
+    if (typeof e !== 'string') throw e
+  } finally {
+    publishing.value = false
+  }
 }
 
 function serializeNode(node: FlowNode): Record<string, unknown> {
