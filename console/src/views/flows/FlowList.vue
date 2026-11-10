@@ -17,7 +17,7 @@
       <el-table-column prop="updatedAt" label="更新时间" width="180" />
       <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="goDesign(row)">设计审批链</el-button>
+          <el-button link type="primary" @click="goDesign(row)">设计审批流程</el-button>
           <template v-if="auth.isTenantAdmin">
             <el-button v-if="row.status === 'PUBLISHED'" link type="warning" @click="onDisable(row)">停用</el-button>
             <el-button v-else-if="row.status === 'DISABLED'" link type="success" @click="onEnable(row)">启用</el-button>
@@ -88,7 +88,7 @@ async function onSave() {
       flowSchema: defaultSchema(),
       formSchema: undefined,
     })
-    ElMessage.success('已保存（草稿），可在操作列进入设计审批链')
+    ElMessage.success('已保存（草稿），可在操作列进入设计审批流程')
     dialogVisible.value = false
     await load()
   } finally {
