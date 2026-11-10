@@ -32,7 +32,7 @@ easy-bpm/
 │  │  └─ bootstrap/              # 演示数据
 │  └─ src/main/resources/db/schema-mysql.sql
 ├─ db/mysql/                     # 生产建表脚本
-├─ console/                      # 前端控制台（P5，待开发）
+├─ console/                      # 控制台前端（Vue3 + TS + Vite + Element Plus + Pinia）
 └─ docs/                         # 架构与接入文档
 ```
 
@@ -64,6 +64,7 @@ java -jar target/easy-bpm-server-1.0.0.jar --spring.profiles.active=local
 - 服务地址：`http://localhost:8090`
 - Swagger UI：`http://localhost:8090/swagger-ui.html`
 - 健康检查：`http://localhost:8090/actuator/health`
+- 控制台前端（可选）：`cd console && pnpm install && pnpm dev`，访问 `http://localhost:8091`（开发代理已指向 8090）
 
 首次启动会自动建业务表、Flowable 引擎表，并写入演示数据（`easybpm.demo.enabled=true`）：
 
@@ -160,7 +161,8 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | P1 | 多租户鉴权 + 流程发布 + 发起/待办/同意/驳回纵切 | ✅ |
 | P2 | 驳回到发起人（TO_START）、撤回、转交、重提、组织同步接口、索引与幂等顺序修复 | ✅ |
 | P3 后端 | 版本回滚、草稿删除、表单 schema 校验（required/type） | ✅ 后端 |
-| P3 | 流程定义可视化编辑、表单设计器 | 待做（前端） |
+| P5 阶段一 | 控制台前端：登录、布局、仪表盘、流程列表/发布/停用/删除/版本回滚、审批链设计器（节点树+属性抽屉）、工作台待办/已办/我发起的、审批详情时间线 | ✅ |
+| P5 阶段二 | 设计器增强（抄送节点、表单设计器）、组织管理、租户凭证页 | 待做 |
 | P4 | Webhook 回调 + 重试、幂等强化、限流、审计日志 | 待做 |
 | P5 | Vue3 控制台（工作台/审批详情/设计器/组织/租户凭证） | 待做 |
 | P6 | Docker Compose、MySQL 初始化脚本、部署与运维文档 | 待做 |
