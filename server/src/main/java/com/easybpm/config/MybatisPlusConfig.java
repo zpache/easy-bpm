@@ -16,12 +16,15 @@ import java.util.Set;
 /**
  * MyBatis-Plus 多租户插件：所有业务表 SQL 自动追加 tenant_id 条件。
  *
- * <p>忽略表只有两类：租户主表、接入凭证表（认证发生在租户上下文建立之前）。
+ * <p>忽略表三类：租户主表、接入凭证表（认证发生在租户上下文建立之前）、
+ * 控制台账号表（平台管理员切换租户后需在目标租户上下文中解析自身账号）；
+ * 后者的租户条件由各查询点手动追加，保证登录与账号校验仍按租户隔离。
  */
 @Configuration
 public class MybatisPlusConfig {
 
-    private static final Set<String> IGNORED_TABLES = Set.of("bpm_tenant", "bpm_tenant_credential");
+    private static final Set<String> IGNORED_TABLES =
+            Set.of("bpm_tenant", "bpm_tenant_credential", "bpm_console_user");
 
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {

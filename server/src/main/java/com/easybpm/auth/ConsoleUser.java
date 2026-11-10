@@ -13,6 +13,8 @@ public class ConsoleUser {
 
     @TableId(type = IdType.INPUT)
     private String id;
+    /** 所属租户。表已移出租户插件自动隔离，由各查询点手动按此列过滤 */
+    private String tenantId;
     private String username;
     private String passwordHash;
     private String displayName;

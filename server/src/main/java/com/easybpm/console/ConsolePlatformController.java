@@ -107,25 +107,29 @@ public class ConsolePlatformController {
         tenant.setUpdatedAt(now);
         tenantMapper.insert(tenant);
 
-        // 初始租户管理员：写入目标租户上下文（bpm_console_user 参与租户隔离）
+        // 初始租户管理员。bpm_console_user 不参与租户插件自动隔离，tenantId 必须显式写入
         String adminUsername = blankToNull(request.adminUsername());
         if (adminUsername != null) {
             String adminPassword = blankToNull(request.adminPassword());
             if (adminPassword == null || adminPassword.length() < 6) {
                 throw new BizException(ErrorCode.BAD_REQUEST, "已填写初始管理员账号时，密码至少 6 位");
             }
-            TenantContext.runAs(tenant.getId(), () -> {
-                ConsoleUser admin = new ConsoleUser();
-                admin.setId(Ids.id());
-                admin.setUsername(adminUsername);
-                admin.setPasswordHash(passwordService.hash(adminPassword));
-                admin.setDisplayName(request.adminDisplayName() == null || request.adminDisplayName().isBlank()
-                        ? tenant.getName() + "管理员" : request.adminDisplayName().trim());
-                admin.setRole("TENANT_ADMIN");
-                admin.setStatus("ACTIVE");
-                admin.setCreatedAt(LocalDateTime.now());
-                consoleUserMapper.insert(admin);
-            });
+            if (consoleUserMapper.selectOne(new LambdaQueryWrapper<ConsoleUser>()
+                    .eq(ConsoleUser::getTenantId, tenant.getId())
+                    .eq(ConsoleUser::getUsername, adminUsername)) != null) {
+                throw new BizException(ErrorCode.CONFLICT, "该租户下已存在同名控制台账号：" + adminUsername);
+            }
+            ConsoleUser admin = new ConsoleUser();
+            admin.setId(Ids.id());
+            admin.setTenantId(tenant.getId());
+            admin.setUsername(adminUsername);
+            admin.setPasswordHash(passwordService.hash(adminPassword));
+            admin.setDisplayName(request.adminDisplayName() == null || request.adminDisplayName().isBlank()
+                    ? tenant.getName() + "管理员" : request.adminDisplayName().trim());
+            admin.setRole("TENANT_ADMIN");
+            admin.setStatus("ACTIVE");
+            admin.setCreatedAt(LocalDateTime.now());
+            consoleUserMapper.insert(admin);
         }
 
         audit.record("TENANT_CREATE", "TENANT", tenant.getId(),
