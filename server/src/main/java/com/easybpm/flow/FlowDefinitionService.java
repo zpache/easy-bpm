@@ -167,10 +167,32 @@ public class FlowDefinitionService {
     @Transactional
     public void disable(String code, String operator) {
         FlowDefinition definition = require(code);
+        if (!"PUBLISHED".equals(definition.getStatus())) {
+            throw BizException.badRequest("仅已发布的流程可停用（code=" + code + "）");
+        }
         definition.setStatus("DISABLED");
         definition.setUpdatedBy(operator);
         definition.setUpdatedAt(LocalDateTime.now());
         definitionMapper.updateById(definition);
+    }
+
+    /**
+     * 启用已停用的流程：恢复到其最后一次发布的版本，无需重新走发布流程。
+     */
+    @Transactional
+    public FlowDefinition enable(String code, String operator) {
+        FlowDefinition definition = require(code);
+        if (!"DISABLED".equals(definition.getStatus())) {
+            throw BizException.badRequest("仅已停用的流程可启用（code=" + code + "）");
+        }
+        if (definition.getProcessDefinitionId() == null) {
+            throw new BizException(ErrorCode.FLOW_SCHEMA_INVALID, "流程缺少引擎部署记录，无法启用，请重新发布");
+        }
+        definition.setStatus("PUBLISHED");
+        definition.setUpdatedBy(operator);
+        definition.setUpdatedAt(LocalDateTime.now());
+        definitionMapper.updateById(definition);
+        return definition;
     }
 
     /**

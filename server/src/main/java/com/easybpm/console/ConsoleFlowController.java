@@ -79,6 +79,15 @@ public class ConsoleFlowController {
         return ApiResponse.ok();
     }
 
+    @PostMapping("/{code}/enable")
+    public ApiResponse<FlowView> enable(@PathVariable String code) {
+        requireAdmin();
+        FlowDefinition definition = definitions.enable(code, CurrentUser.requireApproverId());
+        audit.record("FLOW_ENABLE", "FLOW", code,
+                "启用流程，恢复到 v" + definition.getVersion());
+        return ApiResponse.ok(toView(definition));
+    }
+
     @org.springframework.web.bind.annotation.DeleteMapping("/{code}")
     @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String code) {
