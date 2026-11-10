@@ -17,6 +17,7 @@
     <div class="designer">
       <template v-for="(node, index) in nodes" :key="node.id + index">
         <div class="node" :class="[nodeClass(node), { selected: selectedIndex === index, editable: canEditNode(node) }]" @click="openNodeEdit(index)">
+          <span v-if="node.type === 'START' || node.type === 'END'" class="fixed-tag">流程固定</span>
           <div class="node-type">{{ nodeLabel(node.type) }}</div>
           <div class="node-name">{{ node.name }}</div>
           <div v-if="node.type === 'APPROVAL' && node.props" class="node-props">
@@ -28,8 +29,17 @@
           </div>
           <el-tag v-if="node.condition" size="small" type="warning" style="margin-top: 6px">条件：{{ node.condition }}</el-tag>
         </div>
-        <div v-if="canInsertAfter(index)" class="arrow">
-          <el-button circle size="small" @click.stop="insertAfter(index)">＋</el-button>
+        <div class="connector">
+          <template v-if="canInsertAfter(index)">
+            <span class="seg"></span>
+            <el-button circle size="small" class="insert-btn" @click.stop="insertAfter(index)">＋</el-button>
+            <span class="seg short"></span>
+            <span class="head"></span>
+          </template>
+          <template v-else>
+            <span class="seg"></span>
+            <span class="head"></span>
+          </template>
         </div>
       </template>
     </div>
@@ -358,11 +368,24 @@ onMounted(async () => {
 .node { border: 1px solid #dcdfe6; border-radius: 10px; padding: 12px 16px; cursor: pointer; background: #fff; transition: all 0.2s; }
 .node.editable:hover { border-color: #0960bd; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(9, 96, 189, 0.12); }
 .node.selected { border-color: #0960bd; box-shadow: 0 0 0 2px rgba(9, 96, 189, 0.18); }
-.node.start, .node.end { background: #f4f7fb; text-align: center; }
+.node.start, .node.end { text-align: center; position: relative; }
+.node.start { background: linear-gradient(135deg, #f0fbf2, #dff3e5); border: 1.5px solid #67c23a; }
+.node.start .node-type { color: #529b2e; }
+.node.start .node-name::before { content: '▶ '; color: #67c23a; font-size: 12px; }
+.node.end { background: linear-gradient(135deg, #f5f7fa, #e8ebf0); border: 1.5px solid #909399; }
+.node.end .node-type { color: #73767c; }
+.node.end .node-name::after { content: ' ■'; color: #909399; font-size: 11px; }
+.fixed-tag { position: absolute; top: -10px; right: 8px; font-size: 10px; line-height: 1; padding: 3px 6px; border-radius: 8px; background: #e6e8eb; color: #73767c; }
 .node.approval { background: #eef5ff; }
 .node.cc { background: #f0f9eb; }
 .node-type { font-size: 12px; color: #909399; margin-bottom: 4px; }
 .node-name { font-weight: 600; font-size: 15px; }
 .node-props { font-size: 12px; color: #606266; margin-top: 4px; }
 .arrow { text-align: center; padding: 8px 0; color: #c0c4cc; }
+.connector { display: flex; flex-direction: column; align-items: center; margin: 3px 0; }
+.connector .seg { width: 2px; height: 12px; background: #c8ccd4; }
+.connector .seg.short { height: 6px; }
+.connector .head { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #c8ccd4; }
+.connector .insert-btn { margin: 0; font-weight: 600; color: #0960bd; border-color: #bcd4ee; }
+.connector .insert-btn:hover { background: #ecf3fb; }
 </style>
