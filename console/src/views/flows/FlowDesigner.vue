@@ -219,9 +219,9 @@ onMounted(async () => {
 .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
 .flow-title { font-weight: 600; }
 .designer { max-width: 420px; margin: 0 auto; padding: 24px 0; }
-.node { border: 1px solid #dcdfe6; border-radius: 8px; padding: 12px 16px; cursor: pointer; background: #fff; transition: all 0.2s; }
-.node:hover { border-color: #409eff; }
-.node.selected { border-color: #409eff; box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2); }
+.node { border: 1px solid #dcdfe6; border-radius: 10px; padding: 12px 16px; cursor: pointer; background: #fff; transition: all 0.2s; }
+.node:hover { border-color: #0960bd; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(9, 96, 189, 0.12); }
+.node.selected { border-color: #0960bd; box-shadow: 0 0 0 2px rgba(9, 96, 189, 0.18); }
 .node.start, .node.end { background: #f4f7fb; text-align: center; }
 .node.approval { background: #eef5ff; }
 .node.cc { background: #f0f9eb; }
