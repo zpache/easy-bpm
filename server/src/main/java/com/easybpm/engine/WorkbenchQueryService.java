@@ -7,6 +7,8 @@ import com.easybpm.common.ErrorCode;
 import com.easybpm.common.JsonCodec;
 import com.easybpm.common.PageResult;
 import com.easybpm.flow.BpmnCompiler;
+import com.easybpm.flow.FlowDefinition;
+import com.easybpm.flow.FlowDefinitionMapper;
 import com.easybpm.org.OrgService;
 import com.easybpm.tenant.TenantContext;
 import org.flowable.engine.HistoryService;
@@ -44,10 +46,12 @@ public class WorkbenchQueryService {
     private final JsonCodec json;
     private final OrgService orgService;
     private final BpmnCompiler compiler;
+    private final FlowDefinitionMapper flowMapper;
 
     public WorkbenchQueryService(TaskService taskService, HistoryService historyService,
                                  BpmInstanceMapper instanceMapper, BpmTaskRecordMapper recordMapper,
-                                 JsonCodec json, OrgService orgService, BpmnCompiler compiler) {
+                                 JsonCodec json, OrgService orgService, BpmnCompiler compiler,
+                                 FlowDefinitionMapper flowMapper) {
         this.taskService = taskService;
         this.historyService = historyService;
         this.instanceMapper = instanceMapper;
@@ -55,6 +59,7 @@ public class WorkbenchQueryService {
         this.json = json;
         this.orgService = orgService;
         this.compiler = compiler;
+        this.flowMapper = flowMapper;
     }
 
     public PageResult<TaskView> todo(String userId, int page, int size, String flowCode, String keyword) {
@@ -177,7 +182,13 @@ public class WorkbenchQueryService {
         List<TaskView> pending = active.stream()
                 .map(t -> toTaskView(t, instance, names, null))
                 .toList();
-        return new InstanceDetail(toInstanceView(instance), timeline, pending);
+
+        // 表单字段元数据（可选），用于详情页可读渲染；schema 为空时前端降级展示原始 JSON
+        FlowDefinition flow = flowMapper.selectOne(new LambdaQueryWrapper<FlowDefinition>()
+                .eq(FlowDefinition::getCode, instance.getFlowCode()));
+        Object formSchema = flow == null || flow.getFormSchema() == null
+                ? null : json.readMap(flow.getFormSchema());
+        return new InstanceDetail(toInstanceView(instance), timeline, pending, formSchema);
     }
 
     public InstanceView requireView(String instanceId) {

@@ -89,10 +89,65 @@ export interface InstanceDetail {
   instance: InstanceView
   timeline: TimelineItem[]
   pendingTasks: TaskView[]
+  formSchema?: Record<string, unknown> | null
 }
 
 export interface WorkbenchCounts {
   todo: number
   done: number
   submitted: number
+}
+
+export interface OrgDeptView {
+  deptCode: string
+  name: string
+  parentCode?: string
+  leaderId?: string
+  sortNo?: number
+  updatedAt?: string
+}
+
+export interface OrgUserView {
+  userCode: string
+  name: string
+  deptCode?: string
+  deptName?: string
+  leaderCode?: string
+  title?: string
+  mobile?: string
+  email?: string
+  status: string
+  updatedAt?: string
+}
+
+export interface OrgRoleView {
+  roleCode: string
+  userCount: number
+}
+
+export interface TenantInfo {
+  code: string
+  name: string
+  status: string
+  remark?: string
+  createdAt?: string
+}
+
+export interface TenantCredentialView {
+  id: string
+  name: string
+  appKey: string
+  appSecretMasked: string
+  status: string
+  expireAt?: string
+  lastUsedAt?: string
+  createdAt?: string
+}
+
+export interface CredentialSecretView {
+  id: string
+  name: string
+  appKey: string
+  appSecret: string
+  createdAt?: string
 }

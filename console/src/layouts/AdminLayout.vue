@@ -39,6 +39,16 @@
           <el-icon><Promotion /></el-icon>
           <template #title>我发起的</template>
         </el-menu-item>
+        <template v-if="auth.isTenantAdmin">
+          <el-menu-item index="/org">
+            <el-icon><OfficeBuilding /></el-icon>
+            <template #title>组织管理</template>
+          </el-menu-item>
+          <el-menu-item index="/tenant">
+            <el-icon><Key /></el-icon>
+            <template #title>租户凭证</template>
+          </el-menu-item>
+        </template>
       </el-menu>
       <div class="aside-footer">
         <el-icon class="collapse-btn" @click="toggleCollapse">
@@ -96,7 +106,9 @@ import {
   Expand,
   Finished,
   Fold,
+  Key,
   Odometer,
+  OfficeBuilding,
   Promotion,
   Share,
   SwitchButton,

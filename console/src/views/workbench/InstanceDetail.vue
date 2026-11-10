@@ -47,13 +47,22 @@
 
     <el-card shadow="never" style="margin-top: 16px">
       <template #header>表单数据</template>
-      <pre class="form-data">{{ JSON.stringify(detail.instance.formData ?? {}, null, 2) }}</pre>
+      <el-descriptions v-if="formRows.length" :column="2" border>
+        <el-descriptions-item v-for="row in formRows" :key="row.label" :label="row.label">
+          {{ row.value }}
+        </el-descriptions-item>
+      </el-descriptions>
+      <el-empty v-else description="无表单数据" :image-size="60" />
+      <details v-if="rawJson" class="json-collapse">
+        <summary>原始 JSON</summary>
+        <pre class="form-data">{{ rawJson }}</pre>
+      </details>
     </el-card>
   </el-card>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { instanceDetail } from '@/api/workbench'
 import type { InstanceDetail } from '@/api/types'
@@ -65,6 +74,40 @@ const detail = ref<InstanceDetail | null>(null)
 
 function timelineType(action?: string) {
   return actionType(action) === 'danger' ? 'danger' : actionType(action) === 'success' ? 'success' : 'primary'
+}
+
+interface FormFieldMeta {
+  key?: string
+  label?: string
+  type?: string
+  required?: boolean
+}
+
+/** 按 formSchema 字段元数据渲染为「字段名: 值」；无 schema 时按 formData 键值展示 */
+const formRows = computed(() => {
+  if (!detail.value) return []
+  const data = (detail.value.instance.formData ?? {}) as Record<string, unknown>
+  const schema = detail.value.formSchema as { fields?: FormFieldMeta[] } | null
+  const fields = schema?.fields ?? []
+  if (fields.length) {
+    return fields
+      .map((f) => ({ label: f.label || f.key || '-', value: formatValue(data[f.key ?? '']) }))
+      .filter((r) => r.value !== '')
+  }
+  return Object.entries(data)
+    .map(([key, value]) => ({ label: key, value: formatValue(value) }))
+    .filter((r) => r.value !== '')
+})
+
+const rawJson = computed(() => {
+  const data = detail.value?.instance.formData
+  return data && Object.keys(data).length ? JSON.stringify(data, null, 2) : ''
+})
+
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return ''
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
 }
 
 onMounted(async () => {
@@ -79,5 +122,7 @@ onMounted(async () => {
 .tl-operator { font-weight: 600; }
 .tl-node { color: #909399; font-size: 13px; }
 .tl-comment { margin-top: 4px; color: #606266; font-size: 13px; background: #f5f7fa; padding: 6px 10px; border-radius: 4px; }
-.form-data { font-size: 12px; line-height: 1.6; color: #606266; white-space: pre-wrap; }
+.json-collapse { margin-top: 12px; }
+.json-collapse summary { cursor: pointer; color: #909399; font-size: 13px; }
+.form-data { font-size: 12px; line-height: 1.6; color: #606266; white-space: pre-wrap; background: #f5f7fa; border-radius: 6px; padding: 10px 12px; margin-top: 8px; }
 </style>

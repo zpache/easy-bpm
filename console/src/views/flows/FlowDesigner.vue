@@ -5,6 +5,7 @@
       <span class="flow-title">{{ flow?.name }}（{{ code }}）· 审批链设计</span>
       <span style="flex: 1" />
       <el-button v-if="auth.isTenantAdmin" :disabled="flow?.status === 'DISABLED'" @click="addApprovalNode">+ 审批节点</el-button>
+      <el-button v-if="auth.isTenantAdmin" :disabled="flow?.status === 'DISABLED'" @click="addCcNode">+ 抄送节点</el-button>
       <el-button v-if="auth.isTenantAdmin" type="primary" :disabled="flow?.status === 'DISABLED'" @click="onSave">保存草稿</el-button>
     </div>
 
@@ -21,6 +22,9 @@
             {{ approverText(node.props) }} · {{ node.props.mode === 'ALL' ? '会签' : '或签' }}
             <template v-if="node.props.rejectStrategy === 'TO_START'"> · 驳回退回发起人</template>
           </div>
+          <div v-if="node.type === 'CC' && node.props" class="node-props">
+            抄送给：{{ ccText(node.props) }}
+          </div>
           <el-tag v-if="node.condition" size="small" type="warning" style="margin-top: 6px">条件：{{ node.condition }}</el-tag>
         </div>
         <div v-if="canInsertAfter(index)" class="arrow">
@@ -34,7 +38,10 @@
         <el-form-item label="节点名称">
           <el-input v-model="editing.name" />
         </el-form-item>
-        <el-form-item label="条件表达式">
+        <el-form-item v-if="editing.type === 'CC'" label="抄送人">
+          <el-input v-model="ccUsersInput" placeholder="逗号分隔 userCode" />
+        </el-form-item>
+        <el-form-item v-if="editing.type !== 'CC'" label="条件表达式">
           <el-input v-model="editing.condition" placeholder="如 days > 3，留空表示无条件" />
         </el-form-item>
         <template v-if="editing.type === 'APPROVAL'">
@@ -133,6 +140,21 @@ function approverText(props: NodeProps): string {
   }
 }
 
+function ccText(props: NodeProps): string {
+  const users = typeof props.ccUsers === 'string' ? props.ccUsers : (props.ccUsers ?? []).join(',')
+  return users || '未配置'
+}
+
+const ccUsersInput = computed({
+  get: () => {
+    const value = editing.value?.props?.ccUsers
+    return (typeof value === 'string' ? value : (value ?? []).join(',')) || ''
+  },
+  set: (input: string) => {
+    if (editing.value?.props) editing.value.props.ccUsers = input
+  },
+})
+
 function canInsertAfter(index: number): boolean {
   if (!auth.isTenantAdmin) return false
   const node = nodes.value[index]
@@ -140,13 +162,15 @@ function canInsertAfter(index: number): boolean {
   return node.type !== 'START' && node.type !== 'END' && next && next.type === 'END'
 }
 
-function insertAfter(index: number) {
-  const node: FlowNode & { props: NodeProps } = {
-    id: 'n' + Date.now().toString(36),
-    type: 'APPROVAL',
-    name: '新审批节点',
-    props: { approverType: 'INITIATOR_LEADER', leaderLevel: 1, mode: 'ANY', rejectStrategy: 'TO_END' },
-  }
+function insertAfter(index: number, type: 'APPROVAL' | 'CC' = 'APPROVAL') {
+  const node: FlowNode & { props: NodeProps } = type === 'CC'
+    ? { id: 'c' + Date.now().toString(36), type: 'CC', name: '抄送', props: { ccUsers: '' } }
+    : {
+        id: 'n' + Date.now().toString(36),
+        type: 'APPROVAL',
+        name: '新审批节点',
+        props: { approverType: 'INITIATOR_LEADER', leaderLevel: 1, mode: 'ANY', rejectStrategy: 'TO_END' },
+      }
   nodes.value.splice(index + 1, 0, node)
   selectedIndex.value = index + 1
   editing.value = node
@@ -155,7 +179,12 @@ function insertAfter(index: number) {
 
 function addApprovalNode() {
   const endIndex = nodes.value.findIndex((n) => n.type === 'END')
-  if (endIndex > 0) insertAfter(endIndex - 1)
+  if (endIndex > 0) insertAfter(endIndex - 1, 'APPROVAL')
+}
+
+function addCcNode() {
+  const endIndex = nodes.value.findIndex((n) => n.type === 'END')
+  if (endIndex > 0) insertAfter(endIndex - 1, 'CC')
 }
 
 function removeNode() {
@@ -169,6 +198,11 @@ function removeNode() {
 
 async function onSave() {
   if (!flow.value) return
+  const emptyCc = nodes.value.find((n) => n.type === 'CC' && !splitList(n.props?.ccUsers ?? '').length)
+  if (emptyCc) {
+    ElMessage.warning(`抄送节点「${emptyCc.name}」未配置抄送人`)
+    return
+  }
   await saveFlow({
     code: flow.value.code,
     name: flow.value.name,
@@ -184,6 +218,10 @@ async function onSave() {
 function serializeNode(node: FlowNode): Record<string, unknown> {
   const result: Record<string, unknown> = { id: node.id, type: node.type, name: node.name }
   if (node.condition) result.condition = node.condition
+  if (node.type === 'CC' && node.props) {
+    result.props = { ccUsers: splitList(node.props.ccUsers ?? '') }
+    return result
+  }
   if (node.type === 'APPROVAL' && node.props) {
     const props: Record<string, unknown> = {
       approverType: node.props.approverType,
@@ -211,7 +249,14 @@ function splitList(value: string | string[]): string[] {
 onMounted(async () => {
   flow.value = await fetchFlow(code.value)
   const schema = flow.value.flowSchema as { nodes?: FlowNode[] } | null
-  nodes.value = schema?.nodes ?? []
+  const list = schema?.nodes ?? []
+  // 编辑态归一化：数组形式的抄送人转为逗号分隔字符串
+  list.forEach((n) => {
+    if (n.props && Array.isArray(n.props.ccUsers)) {
+      n.props.ccUsers = n.props.ccUsers.join(',')
+    }
+  })
+  nodes.value = list
 })
 </script>
 
