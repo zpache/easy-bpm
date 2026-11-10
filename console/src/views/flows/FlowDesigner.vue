@@ -65,8 +65,12 @@
                          :label="`${u.name}（${u.userCode}）`" :value="u.userCode" />
             </el-select>
           </el-form-item>
-          <el-form-item v-if="editing.props!.approverType === 'ROLE'" label="角色编码">
-            <el-input v-model="editing.props!.roleCodes" placeholder="逗号分隔角色编码" />
+          <el-form-item v-if="editing.props!.approverType === 'ROLE'" label="指定角色">
+            <el-select v-model="roleCodesInput" multiple filterable allow-create
+                       default-first-option placeholder="从组织架构选择角色，或输入角色编码" style="width: 100%">
+              <el-option v-for="r in roleOptions" :key="r.roleCode"
+                         :label="`${r.roleCode}（${r.userCount} 人）`" :value="r.roleCode" />
+            </el-select>
           </el-form-item>
           <el-form-item v-if="editing.props!.approverType === 'FORM_FIELD'" label="表单字段">
             <el-input v-model="editing.props!.formFieldKey" placeholder="值为 userCode 的字段名" />
@@ -95,9 +99,9 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchFlow, publishFlow, saveFlow } from '@/api/flows'
-import { orgUsers } from '@/api/org'
+import { orgRoles, orgUsers } from '@/api/org'
 import { useAuthStore } from '@/stores/auth'
-import type { OrgUserView } from '@/api/types'
+import type { OrgRoleView, OrgUserView } from '@/api/types'
 
 interface NodeProps {
   approverType?: string
@@ -182,8 +186,9 @@ const ccUsersInput = computed({
   },
 })
 
-// 组织架构人员选项，供「指定人员」下拉选择
+// 组织架构人员/角色选项，供审批人下拉选择
 const userOptions = ref<OrgUserView[]>([])
+const roleOptions = ref<OrgRoleView[]>([])
 
 const specifiedUsersInput = computed({
   get: () => {
@@ -193,6 +198,17 @@ const specifiedUsersInput = computed({
   },
   set: (list: string[]) => {
     if (editing.value?.props) editing.value.props.specifiedUsers = list
+  },
+})
+
+const roleCodesInput = computed({
+  get: () => {
+    const value = editing.value?.props?.roleCodes
+    if (Array.isArray(value)) return value
+    return value ? value.split(/[,，\s]+/).filter(Boolean) : []
+  },
+  set: (list: string[]) => {
+    if (editing.value?.props) editing.value.props.roleCodes = list
   },
 })
 
@@ -315,12 +331,14 @@ function splitList(value: string | string[]): string[] {
 }
 
 onMounted(async () => {
-  const [loaded, users] = await Promise.all([
+  const [loaded, users, roles] = await Promise.all([
     fetchFlow(code.value),
     orgUsers({ page: 1, size: 500 }).catch(() => null),
+    orgRoles().catch(() => null),
   ])
   flow.value = loaded
   userOptions.value = users?.list ?? []
+  roleOptions.value = roles ?? []
   const schema = flow.value.flowSchema as { nodes?: FlowNode[] } | null
   const list = schema?.nodes ?? []
   // 编辑态归一化：数组形式的抄送人转为逗号分隔字符串
