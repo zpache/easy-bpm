@@ -42,6 +42,15 @@ easybpm:
     token-ttl-hours: ${EASY_BPM_TOKEN_TTL_HOURS:12}
   demo:
     enabled: ${EASY_BPM_DEMO_ENABLED:true}
+  webhook:
+    enabled: ${EASY_BPM_WEBHOOK_ENABLED:true}
+    poll-interval-ms: 30000
+    max-attempts: 5
+    connect-timeout-ms: 5000
+    read-timeout-ms: 10000
+  open:
+    # OpenAPI 单机限流（次/分钟，按 AppKey），0 表示关闭
+    rate-limit-per-minute: ${EASY_BPM_RATE_LIMIT:600}
 
 springdoc:
   swagger-ui:

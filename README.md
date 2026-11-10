@@ -179,6 +179,17 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 - 审批链版本存 `bpm_flow_version`，发布即新版本，运行中实例不受影响；回滚 = 取历史版本内容覆盖后发布为 N+1 新版本。
 - 实例对外 ID 恒定：`bpm_instance.instance_id` 创建后不变；`engine_instance_id` 记录当前引擎实例，TO_START 重提时更换。
 
+### 5. Webhook 回调（outbox）
+
+- 实例结束（通过/驳回/撤回）时在业务事务内写 `bpm_webhook_log` PENDING 行，后台每 30s 轮询投递；
+- 失败按 1m/5m/15m/60m 指数退避，默认 5 次后标记 FAILED；请求带 `X-EasyBpm-Signature`（HMAC-SHA256，密钥为租户 `webhook_secret`）；
+- 回调地址：发起时 `callbackUrl` 优先，回退租户 `webhook_url`。详见 `docs/deploy.md` 3.2。
+
+### 6. 限流与审计
+
+- OpenAPI 限流在鉴权前拦截（`/open/*`），固定窗口 60s 按 AppKey 计数，默认 600 次/分钟，超限返回 429 + `42900`；
+- 控制台敏感操作（流程/凭证写操作）自动落 `bpm_audit_log`（含操作人、目标、traceId），控制台「审计日志」页可查。
+
 ## 阶段计划
 
 | 阶段 | 内容 | 状态 |
@@ -189,8 +200,8 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | P3 后端 | 版本回滚、草稿删除、表单 schema 校验（required/type） | ✅ 后端 |
 | P5 阶段一 | 控制台前端：登录、布局、仪表盘、流程列表/发布/停用/删除/版本回滚、审批链设计器（节点树+属性抽屉）、工作台待办/已办/我发起的、审批详情时间线 | ✅ |
 | P5 阶段二 | 设计器增强（抄送节点）、组织管理页、租户凭证页、详情页表单只读渲染 | ✅ |
-| P4 | Webhook 回调 + 重试、幂等强化、限流、审计日志 | 待做 |
-| P6 | Docker Compose、MySQL 初始化脚本、部署与运维文档 | 待做 |
+| P4 | Webhook 回调（outbox + 指数退避重试）、OpenAPI 限流、控制台操作审计 | ✅ |
+| P6 | Docker Compose、部署与运维文档（docs/deploy.md） | ✅ |
 
 ## 注意事项
 

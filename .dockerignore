@@ -1,0 +1,13 @@
+# 构建产物
+server/target/
+console/node_modules/
+console/dist/
+**/.git
+**/.gitignore
+**/*.md
+docs/
+db/
+.workbuddy/
+.idea/
+*.iml
+.DS_Store

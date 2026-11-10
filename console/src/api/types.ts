@@ -151,3 +151,14 @@ export interface CredentialSecretView {
   appSecret: string
   createdAt?: string
 }
+
+export interface AuditView {
+  action: string
+  targetType: string
+  targetId: string
+  operatorId?: string
+  operatorName?: string
+  detail?: string
+  traceId?: string
+  createdAt?: string
+}

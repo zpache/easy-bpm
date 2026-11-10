@@ -2,6 +2,7 @@ package com.easybpm.config;
 
 import com.easybpm.auth.ConsoleAuthFilter;
 import com.easybpm.auth.OpenApiAuthFilter;
+import com.easybpm.open.RateLimitFilter;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,6 +16,14 @@ import java.util.List;
  */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
+
+    @Bean
+    public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(RateLimitFilter filter) {
+        FilterRegistrationBean<RateLimitFilter> bean = new FilterRegistrationBean<>(filter);
+        bean.setUrlPatterns(List.of("/open/*"));
+        bean.setOrder(5);
+        return bean;
+    }
 
     @Bean
     public FilterRegistrationBean<OpenApiAuthFilter> openApiFilterRegistration(OpenApiAuthFilter filter) {

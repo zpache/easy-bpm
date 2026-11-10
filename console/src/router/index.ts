@@ -20,6 +20,7 @@ export const router = createRouter({
         { path: 'instances/:instanceId', name: 'instance-detail', component: () => import('@/views/workbench/InstanceDetail.vue'), meta: { title: '审批详情' } },
         { path: 'org', name: 'org', component: () => import('@/views/Org.vue'), meta: { title: '组织管理', requiresAdmin: true } },
         { path: 'tenant', name: 'tenant', component: () => import('@/views/Tenant.vue'), meta: { title: '租户凭证', requiresAdmin: true } },
+        { path: 'audit', name: 'audit', component: () => import('@/views/Audit.vue'), meta: { title: '审计日志', requiresAdmin: true } },
       ],
     },
   ],
