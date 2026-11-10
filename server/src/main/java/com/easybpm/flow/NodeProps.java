@@ -12,6 +12,7 @@ public record NodeProps(
         Integer leaderLevel,
         ApprovalMode mode,
         RejectStrategy rejectStrategy,
+        EmptyStrategy emptyStrategy,
         List<String> ccUsers
 ) {
 
@@ -21,6 +22,10 @@ public record NodeProps(
 
     public RejectStrategy rejectOrDefault() {
         return rejectStrategy == null ? RejectStrategy.TO_END : rejectStrategy;
+    }
+
+    public EmptyStrategy emptyOrDefault() {
+        return emptyStrategy == null ? EmptyStrategy.FAIL : emptyStrategy;
     }
 
     public int leaderLevelOrDefault() {
