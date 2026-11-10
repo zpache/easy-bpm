@@ -1,5 +1,6 @@
 package com.easybpm.console;
 
+import com.easybpm.audit.AuditService;
 import com.easybpm.auth.CurrentUser;
 import com.easybpm.common.ApiResponse;
 import com.easybpm.common.BizException;
@@ -30,10 +31,12 @@ public class ConsoleFlowController {
 
     private final FlowDefinitionService definitions;
     private final JsonCodec json;
+    private final AuditService audit;
 
-    public ConsoleFlowController(FlowDefinitionService definitions, JsonCodec json) {
+    public ConsoleFlowController(FlowDefinitionService definitions, JsonCodec json, AuditService audit) {
         this.definitions = definitions;
         this.json = json;
+        this.audit = audit;
     }
 
     @GetMapping
@@ -52,6 +55,8 @@ public class ConsoleFlowController {
         FlowDefinition definition = definitions.save(new FlowDefinitionService.SaveCommand(
                 request.code(), request.name(), request.category(), request.icon(), request.description(),
                 request.formSchema(), request.flowSchema()), CurrentUser.requireApproverId());
+        audit.record("FLOW_SAVE", "FLOW", definition.getCode(),
+                (isEdit(request.code()) ? "编辑" : "新建") + "流程「" + definition.getName() + "」");
         return ApiResponse.ok(toView(definition));
     }
 
@@ -60,13 +65,17 @@ public class ConsoleFlowController {
                                          @RequestBody(required = false) PublishRequest request) {
         requireAdmin();
         String changelog = request == null ? null : request.changelog();
-        return ApiResponse.ok(toView(definitions.publish(code, CurrentUser.requireApproverId(), changelog)));
+        FlowDefinition definition = definitions.publish(code, CurrentUser.requireApproverId(), changelog);
+        audit.record("FLOW_PUBLISH", "FLOW", code,
+                "发布 v" + definition.getVersion() + (changelog == null || changelog.isBlank() ? "" : "：" + changelog));
+        return ApiResponse.ok(toView(definition));
     }
 
     @PostMapping("/{code}/disable")
     public ApiResponse<Void> disable(@PathVariable String code) {
         requireAdmin();
         definitions.disable(code, CurrentUser.requireApproverId());
+        audit.record("FLOW_DISABLE", "FLOW", code, "停用流程");
         return ApiResponse.ok();
     }
 
@@ -75,6 +84,7 @@ public class ConsoleFlowController {
     public void delete(@PathVariable String code) {
         requireAdmin();
         definitions.deleteDraft(code, CurrentUser.requireApproverId());
+        audit.record("FLOW_DELETE", "FLOW", code, "删除草稿流程");
     }
 
     @PostMapping("/{code}/versions/{version}/rollback")
@@ -82,8 +92,15 @@ public class ConsoleFlowController {
                                           @RequestBody(required = false) PublishRequest request) {
         requireAdmin();
         String changelog = request == null ? null : request.changelog();
-        return ApiResponse.ok(toView(definitions.rollback(code, version,
-                CurrentUser.requireApproverId(), changelog)));
+        FlowDefinition definition = definitions.rollback(code, version,
+                CurrentUser.requireApproverId(), changelog);
+        audit.record("FLOW_ROLLBACK", "FLOW", code,
+                "从 v" + version + " 回滚，发布为 v" + definition.getVersion());
+        return ApiResponse.ok(toView(definition));
+    }
+
+    private boolean isEdit(String code) {
+        return definitions.find(code) != null;
     }
 
     @GetMapping("/{code}/versions")

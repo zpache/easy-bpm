@@ -25,6 +25,7 @@ public enum ErrorCode {
     TASK_NOT_ASSIGNEE(43002, HttpStatus.FORBIDDEN, "当前用户不是该任务的处理人"),
     TASK_ALREADY_HANDLED(43003, HttpStatus.CONFLICT, "任务已被处理，请刷新后重试"),
     NO_APPROVER(44001, HttpStatus.BAD_REQUEST, "未匹配到审批人，请检查组织架构或流程配置"),
+    TOO_MANY_REQUESTS(42900, HttpStatus.TOO_MANY_REQUESTS, "请求过于频繁，请稍后重试"),
 
     INTERNAL(50000, HttpStatus.INTERNAL_SERVER_ERROR, "服务内部错误");
 

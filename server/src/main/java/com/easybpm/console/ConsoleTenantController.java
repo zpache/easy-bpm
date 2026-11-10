@@ -1,6 +1,7 @@
 package com.easybpm.console;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.easybpm.audit.AuditService;
 import com.easybpm.auth.CurrentUser;
 import com.easybpm.common.ApiResponse;
 import com.easybpm.common.BizException;
@@ -38,10 +39,13 @@ public class ConsoleTenantController {
 
     private final TenantMapper tenantMapper;
     private final TenantCredentialMapper credentialMapper;
+    private final AuditService audit;
 
-    public ConsoleTenantController(TenantMapper tenantMapper, TenantCredentialMapper credentialMapper) {
+    public ConsoleTenantController(TenantMapper tenantMapper, TenantCredentialMapper credentialMapper,
+                                   AuditService audit) {
         this.tenantMapper = tenantMapper;
         this.credentialMapper = credentialMapper;
+        this.audit = audit;
     }
 
     @GetMapping("/info")
@@ -80,6 +84,8 @@ public class ConsoleTenantController {
         credential.setCreatedAt(LocalDateTime.now());
         // AppKey 唯一索引兜底，随机空间下碰撞概率可忽略，不做重试
         credentialMapper.insert(credential);
+        audit.record("CREDENTIAL_CREATE", "CREDENTIAL", credential.getId(),
+                "新建凭证「" + credential.getName() + "」，AppKey=" + credential.getAppKey());
         return ApiResponse.ok(toSecretView(credential));
     }
 
@@ -90,6 +96,8 @@ public class ConsoleTenantController {
         credential.setAppSecret("sk_" + randomHex(32));
         credential.setStatus("ACTIVE");
         credentialMapper.updateById(credential);
+        audit.record("CREDENTIAL_ROTATE", "CREDENTIAL", credential.getId(),
+                "轮换凭证「" + credential.getName() + "」，AppKey=" + credential.getAppKey());
         return ApiResponse.ok(toSecretView(credential));
     }
 
@@ -99,6 +107,8 @@ public class ConsoleTenantController {
         TenantCredential credential = requireOwned(id);
         credential.setStatus("DISABLED");
         credentialMapper.updateById(credential);
+        audit.record("CREDENTIAL_DISABLE", "CREDENTIAL", credential.getId(),
+                "停用凭证「" + credential.getName() + "」");
         return ApiResponse.ok();
     }
 

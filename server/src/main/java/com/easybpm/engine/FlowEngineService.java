@@ -17,6 +17,9 @@ import com.easybpm.flow.RejectStrategy;
 import com.easybpm.org.OrgService;
 import com.easybpm.org.OrgUser;
 import com.easybpm.tenant.TenantContext;
+import com.easybpm.tenant.Tenant;
+import com.easybpm.tenant.TenantMapper;
+import com.easybpm.webhook.WebhookService;
 import org.flowable.common.engine.api.FlowableObjectNotFoundException;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
@@ -65,13 +68,16 @@ public class FlowEngineService {
     private final HistoryService historyService;
     private final BpmInstanceMapper instanceMapper;
     private final BpmTaskRecordMapper recordMapper;
+    private final TenantMapper tenantMapper;
+    private final WebhookService webhookService;
 
     public FlowEngineService(FlowDefinitionService definitions, BpmnCompiler compiler, JsonCodec json,
                              FormValidator formValidator, ApproverResolver approverResolver,
                              ConditionEvaluator conditionEvaluator,
                              OrgService orgService, RuntimeService runtimeService, TaskService taskService,
                              HistoryService historyService, BpmInstanceMapper instanceMapper,
-                             BpmTaskRecordMapper recordMapper) {
+                             BpmTaskRecordMapper recordMapper, TenantMapper tenantMapper,
+                             WebhookService webhookService) {
         this.definitions = definitions;
         this.compiler = compiler;
         this.json = json;
@@ -84,6 +90,8 @@ public class FlowEngineService {
         this.historyService = historyService;
         this.instanceMapper = instanceMapper;
         this.recordMapper = recordMapper;
+        this.tenantMapper = tenantMapper;
+        this.webhookService = webhookService;
     }
 
     @Transactional
@@ -230,6 +238,8 @@ public class FlowEngineService {
         projection.setEndedAt(now);
         projection.setUpdatedAt(now);
         instanceMapper.updateById(projection);
+
+        enqueueWebhook(projection, "instance.canceled");
 
         insertRecord(projection.getInstanceId(), null, null, "撤回", userId,
                 displayName(userId), TaskAction.REVOKE, comment);
@@ -429,6 +439,7 @@ public class FlowEngineService {
             projection.setStatus(status);
             projection.setEndedAt(now);
             projection.setCurrentNodeName(rejected ? projection.getCurrentNodeName() : "审批通过");
+            enqueueWebhook(projection, "instance.completed");
         } else {
             projection.setStatus(InstanceStatus.RUNNING.name());
             projection.setCurrentNodeName(activeNodeNames(processInstanceId));
@@ -437,6 +448,37 @@ public class FlowEngineService {
         instanceMapper.updateById(projection);
         return new ActionResult(processInstanceId, projection.getStatus(),
                 projection.getCurrentNodeName(), projection.getEndedAt());
+    }
+
+    /**
+     * 实例结束时进入 outbox：事务内写 PENDING 行，由 WebhookService 轮询投递与重试。
+     * 回调地址优先取发起时指定的 callback_url，否则回退租户 webhook_url。
+     */
+    private void enqueueWebhook(BpmInstance projection, String eventType) {
+        try {
+            String url = projection.getCallbackUrl();
+            if (url == null || url.isBlank()) {
+                Tenant tenant = tenantMapper.selectById(TenantContext.require());
+                url = tenant == null ? null : tenant.getWebhookUrl();
+            }
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("event", eventType);
+            payload.put("instanceId", projection.getInstanceId());
+            payload.put("flowCode", projection.getFlowCode());
+            payload.put("flowName", projection.getFlowName());
+            payload.put("title", projection.getTitle());
+            payload.put("status", projection.getStatus());
+            payload.put("businessKey", projection.getBusinessKey());
+            payload.put("initiatorId", projection.getInitiatorId());
+            payload.put("initiatorName", projection.getInitiatorName());
+            payload.put("endedAt", projection.getEndedAt() == null ? null : projection.getEndedAt().toString());
+            payload.put("formData", json.readMap(projection.getFormData()));
+            webhookService.enqueue(TenantContext.require(), projection.getInstanceId(), eventType, url, payload);
+        } catch (Exception e) {
+            // 回调入队失败不影响审批主流程，PENDING 行缺失可通过审计与日志排查
+            org.slf4j.LoggerFactory.getLogger(FlowEngineService.class)
+                    .warn("webhook enqueue 失败 instance={} event={}", projection.getInstanceId(), eventType, e);
+        }
     }
 
     private String activeNodeNames(String processInstanceId) {

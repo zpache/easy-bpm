@@ -48,6 +48,10 @@
             <el-icon><Key /></el-icon>
             <template #title>租户凭证</template>
           </el-menu-item>
+          <el-menu-item index="/audit">
+            <el-icon><Memo /></el-icon>
+            <template #title>审计日志</template>
+          </el-menu-item>
         </template>
       </el-menu>
       <div class="aside-footer">
@@ -107,6 +111,7 @@ import {
   Finished,
   Fold,
   Key,
+  Memo,
   Odometer,
   OfficeBuilding,
   Promotion,
