@@ -34,7 +34,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.regex.Pattern;
 
 /**
  * 平台管理员能力：租户全生命周期管理 + 切换租户上下文。
@@ -50,7 +49,9 @@ public class ConsolePlatformController {
 
     /** 平台租户编码，与 DemoDataInitializer 保持一致 */
     public static final String PLATFORM_TENANT_CODE = "platform";
-    private static final Pattern CODE_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{1,31}$");
+    /** 正则用全限定名，避免与 jakarta.validation.constraints.Pattern 冲突 */
+    private static final java.util.regex.Pattern CODE_PATTERN =
+            java.util.regex.Pattern.compile("^[a-z][a-z0-9-]{1,31}$");
 
     private final TenantMapper tenantMapper;
     private final TenantCredentialMapper credentialMapper;
