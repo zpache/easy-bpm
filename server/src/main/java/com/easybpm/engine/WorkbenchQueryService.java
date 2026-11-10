@@ -153,6 +153,24 @@ public class WorkbenchQueryService {
         return PageResult.of(views, result.getTotal(), page, size);
     }
 
+    /**
+     * 管理员视角：本租户全部实例分页查询，支持流程/状态过滤，关键字匹配标题或发起人姓名。
+     * 调用方须自行校验管理员权限。
+     */
+    public PageResult<InstanceView> allInstances(int page, int size, String flowCode, String status,
+                                                 String keyword) {
+        boolean hasKeyword = keyword != null && !keyword.isBlank();
+        LambdaQueryWrapper<BpmInstance> wrapper = new LambdaQueryWrapper<BpmInstance>()
+                .eq(flowCode != null && !flowCode.isBlank(), BpmInstance::getFlowCode, flowCode)
+                .eq(status != null && !status.isBlank(), BpmInstance::getStatus, status)
+                .and(hasKeyword, w -> w.like(BpmInstance::getTitle, keyword)
+                        .or().like(BpmInstance::getInitiatorName, keyword))
+                .orderByDesc(BpmInstance::getStartedAt);
+        Page<BpmInstance> result = instanceMapper.selectPage(new Page<>(page, size), wrapper);
+        List<InstanceView> views = result.getRecords().stream().map(this::toInstanceView).toList();
+        return PageResult.of(views, result.getTotal(), page, size);
+    }
+
     public WorkbenchCounts counts(String userId) {
         String tenantId = TenantContext.require();
         long todo = taskService.createTaskQuery().taskTenantId(tenantId).taskAssignee(userId).count();
