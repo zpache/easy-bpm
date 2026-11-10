@@ -31,6 +31,10 @@ export function disableFlow(code: string) {
   return http.post<never, void>(`/api/flows/${code}/disable`)
 }
 
+export function enableFlow(code: string) {
+  return http.post<never, FlowDefinition>(`/api/flows/${code}/enable`)
+}
+
 export function deleteFlow(code: string) {
   return http.delete<never, void>(`/api/flows/${code}`)
 }

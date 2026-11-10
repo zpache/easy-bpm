@@ -20,9 +20,10 @@
           <el-button link type="primary" @click="goDesign(row)">设计审批链</el-button>
           <el-button link @click="goVersions(row)">版本历史</el-button>
           <template v-if="auth.isTenantAdmin">
-            <el-button link type="warning" @click="onDisable(row)">停用</el-button>
-            <el-button link type="danger" @click="onDelete(row)">删除</el-button>
+            <el-button v-if="row.status === 'PUBLISHED'" link type="warning" @click="onDisable(row)">停用</el-button>
+            <el-button v-else-if="row.status === 'DISABLED'" link type="success" @click="onEnable(row)">启用</el-button>
           </template>
+          <el-button link type="danger" @click="onDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -54,7 +55,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { deleteFlow, disableFlow, listFlows, saveFlow } from '@/api/flows'
+import { deleteFlow, disableFlow, enableFlow, listFlows, saveFlow } from '@/api/flows'
 import { useAuthStore } from '@/stores/auth'
 import { statusText, statusType } from '@/utils/labels'
 import type { FlowDefinition } from '@/api/types'
@@ -107,9 +108,16 @@ function defaultSchema() {
 }
 
 async function onDisable(row: FlowDefinition) {
-  await ElMessageBox.confirm(`确认停用「${row.name}」？运行中实例不受影响`, '停用', { type: 'warning' })
+  await ElMessageBox.confirm(`确认停用「${row.name}」？运行中实例不受影响，停用后可通过「启用」恢复`, '停用', { type: 'warning' })
   await disableFlow(row.code)
   ElMessage.success('已停用')
+  await load()
+}
+
+async function onEnable(row: FlowDefinition) {
+  await ElMessageBox.confirm(`确认启用「${row.name}」？将恢复到其最后一次发布的版本 v${row.version}`, '启用', { type: 'info' })
+  await enableFlow(row.code)
+  ElMessage.success('已启用')
   await load()
 }
 
