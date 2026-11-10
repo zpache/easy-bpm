@@ -15,6 +15,7 @@
           <h1 class="brand-title">easy-bpm</h1>
           <p class="brand-sub">轻量级审批流平台 · 快速接入 ERP / SaaS</p>
           <div class="brand-features">
+            <div class="feature-item"><span class="dot" />业务表单零设计，数据归业务系统，变更零同步</div>
             <div class="feature-item"><span class="dot" />多租户隔离，数据互不可见</div>
             <div class="feature-item"><span class="dot" />OpenAPI 全链路，一行代码发起审批</div>
             <div class="feature-item"><span class="dot" />Flowable 引擎驱动，条件分支 / 或签会签</div>
