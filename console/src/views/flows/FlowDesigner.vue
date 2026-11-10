@@ -46,17 +46,20 @@
 
     <el-drawer v-model="drawerVisible" :title="isNewNode ? '新增节点' : `编辑${nodeLabel(editing?.type ?? 'APPROVAL')}节点`" size="440px">
       <el-form v-if="editing" :model="editing" label-width="100px">
-        <el-form-item label="节点名称">
+        <el-alert type="info" :closable="false" style="margin-bottom: 16px">
+          带 <span style="color: #f56c6c">*</span> 为必填项
+        </el-alert>
+        <el-form-item label="节点名称" required>
           <el-input v-model="editing.name" />
         </el-form-item>
-        <el-form-item v-if="editing.type === 'CC'" label="抄送人">
+        <el-form-item v-if="editing.type === 'CC'" label="抄送人" required>
           <el-input v-model="ccUsersInput" placeholder="逗号分隔 userCode" />
         </el-form-item>
         <el-form-item v-if="editing.type !== 'CC'" label="条件表达式">
           <el-input v-model="editing.condition" placeholder="如 days > 3，留空表示无条件" />
         </el-form-item>
         <template v-if="editing.type === 'APPROVAL'">
-          <el-form-item label="审批人类型">
+          <el-form-item label="审批人类型" required>
             <el-select v-model="editing.props!.approverType">
               <el-option label="发起人直属主管" value="INITIATOR_LEADER" />
               <el-option label="部门主管" value="DEPT_LEADER" />
@@ -68,30 +71,30 @@
           <el-form-item v-if="editing.props!.approverType === 'INITIATOR_LEADER'" label="主管级别">
             <el-input-number v-model="editing.props!.leaderLevel" :min="1" :max="5" />
           </el-form-item>
-          <el-form-item v-if="editing.props!.approverType === 'SPECIFIED'" label="指定人员">
+          <el-form-item v-if="editing.props!.approverType === 'SPECIFIED'" label="指定人员" required>
             <el-select v-model="specifiedUsersInput" multiple filterable allow-create
                        default-first-option placeholder="从组织架构选择，或输入 userCode" style="width: 100%">
               <el-option v-for="u in userOptions" :key="u.userCode"
                          :label="`${u.name}（${u.userCode}）`" :value="u.userCode" />
             </el-select>
           </el-form-item>
-          <el-form-item v-if="editing.props!.approverType === 'ROLE'" label="指定角色">
+          <el-form-item v-if="editing.props!.approverType === 'ROLE'" label="指定角色" required>
             <el-select v-model="roleCodesInput" multiple filterable allow-create
                        default-first-option placeholder="从组织架构选择角色，或输入角色编码" style="width: 100%">
               <el-option v-for="r in roleOptions" :key="r.roleCode"
                          :label="`${r.roleCode}（${r.userCount} 人）`" :value="r.roleCode" />
             </el-select>
           </el-form-item>
-          <el-form-item v-if="editing.props!.approverType === 'FORM_FIELD'" label="表单字段">
+          <el-form-item v-if="editing.props!.approverType === 'FORM_FIELD'" label="表单字段" required>
             <el-input v-model="editing.props!.formFieldKey" placeholder="值为 userCode 的字段名" />
           </el-form-item>
-          <el-form-item label="审批方式">
+          <el-form-item label="审批方式" required>
             <el-select v-model="editing.props!.mode">
               <el-option label="或签（一人通过即过）" value="ANY" />
               <el-option label="会签（全部通过才过）" value="ALL" />
             </el-select>
           </el-form-item>
-          <el-form-item label="驳回策略">
+          <el-form-item label="驳回策略" required>
             <el-select v-model="editing.props!.rejectStrategy">
               <el-option label="驳回到结束" value="TO_END" />
               <el-option label="退回发起人重提" value="TO_START" />
@@ -266,10 +269,27 @@ function removeNode() {
 
 async function saveDraft(): Promise<boolean> {
   if (!flow.value) return false
-  const emptyCc = nodes.value.find((n) => n.type === 'CC' && !splitList(n.props?.ccUsers ?? '').length)
-  if (emptyCc) {
-    ElMessage.warning(`抄送节点「${emptyCc.name}」未配置抄送人`)
-    return false
+  for (const node of nodes.value) {
+    if (!node.name?.trim()) {
+      ElMessage.warning(`「${nodeLabel(node.type)}」节点名称不能为空`)
+      return false
+    }
+    if (node.type === 'APPROVAL') {
+      const emptyList = (node.props?.approverType === 'SPECIFIED' && !splitList(node.props.specifiedUsers ?? '').length)
+        || (node.props?.approverType === 'ROLE' && !splitList(node.props.roleCodes ?? '').length)
+      if (emptyList) {
+        ElMessage.warning(`审批节点「${node.name}」未指定审批人`)
+        return false
+      }
+      if (node.props?.approverType === 'FORM_FIELD' && !node.props.formFieldKey?.trim()) {
+        ElMessage.warning(`审批节点「${node.name}」未填写表单字段`)
+        return false
+      }
+    }
+    if (node.type === 'CC' && !splitList(node.props?.ccUsers ?? '').length) {
+      ElMessage.warning(`抄送节点「${node.name}」未配置抄送人`)
+      return false
+    }
   }
   await saveFlow({
     code: flow.value.code,
