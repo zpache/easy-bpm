@@ -84,7 +84,9 @@ public class ConsoleFlowController {
         requireAdmin();
         FlowDefinition definition = definitions.enable(code, CurrentUser.requireApproverId());
         audit.record("FLOW_ENABLE", "FLOW", code,
-                "启用流程，恢复到 v" + definition.getVersion());
+                "DRAFT".equals(definition.getStatus())
+                        ? "启用流程，从未发布过，恢复为草稿"
+                        : "启用流程，恢复到 v" + definition.getVersion());
         return ApiResponse.ok(toView(definition));
     }
 
