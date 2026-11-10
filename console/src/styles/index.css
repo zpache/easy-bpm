@@ -1,0 +1,89 @@
+/* easy-bpm console 全局主题（vben admin 设计语言） */
+
+:root {
+  /* vben 主色 */
+  --vben-primary: #0960bd;
+  --vben-success: #55d187;
+  --vben-warning: #fba834;
+  --vben-danger: #ed6f6f;
+  --vben-sidebar-bg: #0f172a;
+  --vben-content-bg: #f0f2f5;
+
+  /* 覆盖 Element Plus 主色 */
+  --el-color-primary: #0960bd;
+  --el-color-primary-light-3: #4b87cb;
+  --el-color-primary-light-5: #84b0de;
+  --el-color-primary-light-7: #bdd4ef;
+  --el-color-primary-light-8: #dee8f6;
+  --el-color-primary-light-9: #eff4fb;
+  --el-color-primary-dark-2: #074d96;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body, #app {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 卡片：vben 风格圆角 + 轻阴影 */
+.el-card {
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.el-card__header {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 14px 20px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+/* 按钮：小圆角 */
+.el-button { border-radius: 6px; font-weight: 500; }
+.el-button.is-round { border-radius: 20px; }
+
+/* 对话框 / 消息框 */
+.el-dialog { border-radius: 10px; }
+.el-message-box { border-radius: 10px; }
+
+/* 表格：浅灰表头 */
+.el-table {
+  --el-table-header-bg-color: #fafafa;
+  --el-table-header-text-color: #4e5969;
+  --el-table-row-hover-bg-color: #eff4fb;
+}
+.el-table th.el-table__cell { font-weight: 600; }
+
+/* 标签 */
+.el-tag { border-radius: 4px; font-weight: 500; }
+
+/* 输入控件圆角 */
+.el-input__wrapper { border-radius: 6px; }
+.el-select__wrapper { border-radius: 6px; }
+.el-textarea__inner { border-radius: 6px; }
+
+/* 分页右对齐留白 */
+.el-pagination { justify-content: flex-end; }
+
+/* 路由切换动画（vben fade-slide） */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateX(-16px);
+}
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateX(16px);
+}
+
+/* 全局细滚动条 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: rgba(144, 147, 153, 0.35); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(144, 147, 153, 0.55); }
+::-webkit-scrollbar-track { background: transparent; }
