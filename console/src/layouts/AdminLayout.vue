@@ -39,6 +39,10 @@
           <el-icon><Promotion /></el-icon>
           <template #title>我发起的</template>
         </el-menu-item>
+        <el-menu-item index="/workbench/cc">
+          <el-icon><Message /></el-icon>
+          <template #title>抄送我的</template>
+        </el-menu-item>
         <template v-if="auth.isTenantAdmin">
           <el-menu-item index="/org">
             <el-icon><OfficeBuilding /></el-icon>
@@ -112,6 +116,7 @@ import {
   Fold,
   Key,
   Memo,
+  Message,
   Odometer,
   OfficeBuilding,
   Promotion,

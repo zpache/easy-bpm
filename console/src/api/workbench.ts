@@ -1,5 +1,5 @@
 import http from '@/api/request'
-import type { InstanceDetail, InstanceView, PageResult, TaskView, WorkbenchCounts } from './types'
+import type { CcView, InstanceDetail, InstanceView, PageResult, TaskView, WorkbenchCounts } from './types'
 
 export interface PageParams {
   page?: number
@@ -7,6 +7,7 @@ export interface PageParams {
   flowCode?: string
   keyword?: string
   status?: string
+  unreadOnly?: boolean
 }
 
 function toQuery(params: PageParams) {
@@ -31,6 +32,17 @@ export function submittedInstances(params: PageParams) {
 
 export function workbenchCounts() {
   return http.get<never, WorkbenchCounts>('/api/workbench/counts')
+}
+
+export function ccList(params: PageParams) {
+  const query: Record<string, string | number | boolean> = { page: params.page ?? 1, size: params.size ?? 10 }
+  if (params.keyword) query.keyword = params.keyword
+  if (params.unreadOnly) query.unreadOnly = true
+  return http.get<never, PageResult<CcView>>('/api/workbench/cc', { params: query })
+}
+
+export function markCcRead(id: string) {
+  return http.post<never, void>(`/api/workbench/cc/${id}/read`)
 }
 
 export function instanceDetail(instanceId: string) {

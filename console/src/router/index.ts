@@ -17,6 +17,7 @@ export const router = createRouter({
         { path: 'workbench/todo', name: 'todo', component: () => import('@/views/workbench/TaskList.vue'), meta: { title: '待办', tab: 'todo' } },
         { path: 'workbench/done', name: 'done', component: () => import('@/views/workbench/TaskList.vue'), meta: { title: '已办', tab: 'done' } },
         { path: 'workbench/submitted', name: 'submitted', component: () => import('@/views/workbench/SubmittedList.vue'), meta: { title: '我发起的' } },
+        { path: 'workbench/cc', name: 'cc', component: () => import('@/views/workbench/CcList.vue'), meta: { title: '抄送我的' } },
         { path: 'instances/:instanceId', name: 'instance-detail', component: () => import('@/views/workbench/InstanceDetail.vue'), meta: { title: '审批详情' } },
         { path: 'org', name: 'org', component: () => import('@/views/Org.vue'), meta: { title: '组织管理', requiresAdmin: true } },
         { path: 'tenant', name: 'tenant', component: () => import('@/views/Tenant.vue'), meta: { title: '租户凭证', requiresAdmin: true } },

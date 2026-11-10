@@ -1,0 +1,33 @@
+## 集成测试专用配置：H2 内存库（原生模式，Flowable 自行建 ACT_* 表）
+spring:
+  datasource:
+    url: jdbc:h2:mem:easybpm-test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema-h2.sql
+
+flowable:
+  database-schema-update: true
+  async-executor-activate: false
+  history-level: audit
+
+easybpm:
+  security:
+    jwt-secret: test-only-secret-not-for-production-0123456789
+    token-ttl-hours: 1
+  demo:
+    enabled: false
+  webhook:
+    enabled: false
+    poll-interval-ms: 3600000
+  open:
+    rate-limit-per-minute: 0
+
+logging:
+  level:
+    root: WARN
+    com.easybpm: INFO

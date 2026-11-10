@@ -106,6 +106,8 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | POST | `/tasks/{taskId}/approve` | 同意 |
 | POST | `/tasks/{taskId}/reject` | 驳回（TO_END 结束 / TO_START 退回发起人） |
 | POST | `/tasks/{taskId}/transfer` | 转交给其他在职人员 |
+| GET | `/cc?userId=` | 抄送我的（可按未读过滤、按标题搜索） |
+| POST | `/cc/{id}/read` | 标记抄送已读（仅本人，幂等） |
 | POST | `/instances/{instanceId}/resubmit` | TO_START 驳回后重新提交 |
 | POST | `/instances/{instanceId}/withdraw` | 发起人撤回（CANCELED） |
 | POST | `/org/sync` | 组织同步（人员/部门/角色批量 upsert） |
@@ -123,7 +125,9 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | GET | `/flows/{code}/versions` | 版本列表 |
 | POST | `/flows/{code}/versions/{version}/rollback` | 回滚到历史版本（立即发布为新版本） |
 | GET | `/workbench/todo\|done\|submitted` | 工作台三种列表 |
-| GET | `/workbench/counts` | 待办/已办/已提交数量 |
+| GET | `/workbench/cc` | 抄送我的（支持 `unreadOnly` 未读过滤） |
+| POST | `/workbench/cc/{id}/read` | 标记抄送已读 |
+| GET | `/workbench/counts` | 待办/已办/已提交/未读抄送数量 |
 | POST | `/workbench/tasks/{taskId}/approve\|reject` | 控制台审批（身份取登录账号绑定人员） |
 | GET | `/org/depts\|users\|roles` | 组织数据只读查询（写入走 OpenAPI /org/sync） |
 | GET | `/tenant/info` | 当前租户信息 |
@@ -190,6 +194,12 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 - OpenAPI 限流在鉴权前拦截（`/open/*`），固定窗口 60s 按 AppKey 计数，默认 600 次/分钟，超限返回 429 + `42900`；
 - 控制台敏感操作（流程/凭证写操作）自动落 `bpm_audit_log`（含操作人、目标、traceId），控制台「审计日志」页可查。
 
+### 7. 抄送闭环
+
+- 抄送节点执行时写 `bpm_cc`（接收人、节点、已读标记），同时落一条 `CC` 时间线；
+- 被抄送人通过 `/open/v1/cc` 或控制台「抄送我的」查看，支持未读过滤与标题搜索，标记已读仅限本人；
+- `counts` 接口返回 `ccUnread`，接入方可在自己的消息中心做红点。
+
 ## 阶段计划
 
 | 阶段 | 内容 | 状态 |
@@ -202,6 +212,18 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | P5 阶段二 | 设计器增强（抄送节点）、组织管理页、租户凭证页、详情页表单只读渲染 | ✅ |
 | P4 | Webhook 回调（outbox + 指数退避重试）、OpenAPI 限流、控制台操作审计 | ✅ |
 | P6 | Docker Compose、部署与运维文档（docs/deploy.md） | ✅ |
+| P7 | 抄送闭环（抄送我的查询/已读）+ 核心链路集成测试基线 | ✅ |
+
+## 测试
+
+```bash
+cd server && mvn test
+```
+
+- 集成测试使用 H2 内存库（原生模式，Flowable 自动建 `ACT_*` 表）+ 真实引擎，无需外部依赖；
+- 测试 DDL 见 `server/src/test/resources/db/schema-h2.sql`，配置见 `application-test.yml`；
+- 覆盖：发起→同意、驳回 TO_END、驳回 TO_START→重提（ID 恒定）、撤回、幂等键、租户隔离、抄送闭环与越权、审批人为空 AUTO_PASS 兜底；
+- 每个用例使用独立租户，互不污染。
 
 ## 注意事项
 

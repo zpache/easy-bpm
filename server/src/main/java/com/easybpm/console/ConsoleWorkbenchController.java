@@ -4,6 +4,7 @@ import com.easybpm.auth.CurrentUser;
 import com.easybpm.common.ApiResponse;
 import com.easybpm.common.PageResult;
 import com.easybpm.engine.ActionResult;
+import com.easybpm.engine.CcView;
 import com.easybpm.engine.FlowEngineService;
 import com.easybpm.engine.InstanceDetail;
 import com.easybpm.engine.InstanceView;
@@ -64,6 +65,21 @@ public class ConsoleWorkbenchController {
     @GetMapping("/counts")
     public ApiResponse<WorkbenchCounts> counts() {
         return ApiResponse.ok(query.counts(CurrentUser.requireApproverId()));
+    }
+
+    @GetMapping("/cc")
+    public ApiResponse<PageResult<CcView>> cc(@RequestParam(defaultValue = "1") int page,
+                                              @RequestParam(defaultValue = "20") int size,
+                                              @RequestParam(defaultValue = "false") boolean unreadOnly,
+                                              @RequestParam(required = false) String keyword) {
+        return ApiResponse.ok(query.cc(CurrentUser.requireApproverId(), page(page), size(size),
+                unreadOnly, keyword));
+    }
+
+    @PostMapping("/cc/{id}/read")
+    public ApiResponse<Void> readCc(@PathVariable String id) {
+        query.markCcRead(id, CurrentUser.requireApproverId());
+        return ApiResponse.ok();
     }
 
     @GetMapping("/instances/{instanceId}")
