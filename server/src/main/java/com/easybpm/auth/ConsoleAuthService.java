@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.easybpm.common.BizException;
 import com.easybpm.common.ErrorCode;
 import com.easybpm.tenant.Tenant;
-import com.easybpm.tenant.TenantContext;
 import com.easybpm.tenant.TenantService;
 import org.springframework.stereotype.Service;
 
@@ -28,8 +27,10 @@ public class ConsoleAuthService {
 
     public LoginResult login(String tenantCode, String username, String password) {
         Tenant tenant = tenantService.requireByCode(tenantCode);
-        ConsoleUser user = TenantContext.callAs(tenant.getId(), () -> userMapper.selectOne(
-                new LambdaQueryWrapper<ConsoleUser>().eq(ConsoleUser::getUsername, username)));
+        // bpm_console_user 不参与租户插件自动隔离，手动按租户过滤
+        ConsoleUser user = userMapper.selectOne(new LambdaQueryWrapper<ConsoleUser>()
+                .eq(ConsoleUser::getTenantId, tenant.getId())
+                .eq(ConsoleUser::getUsername, username));
 
         if (user == null || !passwordService.matches(password, user.getPasswordHash())) {
             throw new BizException(ErrorCode.UNAUTHORIZED, "租户编码、账号或密码不正确");
@@ -42,7 +43,7 @@ public class ConsoleAuthService {
         ConsoleUser update = new ConsoleUser();
         update.setId(user.getId());
         update.setLastLoginAt(now);
-        TenantContext.runAs(tenant.getId(), () -> userMapper.updateById(update));
+        userMapper.updateById(update);
 
         AuthPrincipal principal = new AuthPrincipal(user.getId(), tenant.getId(), user.getDisplayName(),
                 user.getRole(), user.getExternalUserId());

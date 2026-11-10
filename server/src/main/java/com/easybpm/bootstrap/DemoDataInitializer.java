@@ -131,11 +131,13 @@ public class DemoDataInitializer implements ApplicationRunner {
         }
         TenantContext.runAs(PLATFORM_TENANT_ID, () -> {
             if (consoleUserMapper.selectOne(new LambdaQueryWrapper<ConsoleUser>()
+                    .eq(ConsoleUser::getTenantId, PLATFORM_TENANT_ID)
                     .eq(ConsoleUser::getUsername, "platadmin")) != null) {
                 return;
             }
             ConsoleUser user = new ConsoleUser();
             user.setId(Ids.id());
+            user.setTenantId(PLATFORM_TENANT_ID);
             user.setUsername("platadmin");
             user.setPasswordHash(passwordService.hash("admin123"));
             user.setDisplayName("平台管理员");
@@ -252,11 +254,13 @@ public class DemoDataInitializer implements ApplicationRunner {
     private void consoleUser(String username, String password, String displayName, String externalUserId,
                              String role, LocalDateTime now) {
         if (consoleUserMapper.selectOne(new LambdaQueryWrapper<ConsoleUser>()
+                .eq(ConsoleUser::getTenantId, TENANT_ID)
                 .eq(ConsoleUser::getUsername, username)) != null) {
             return;
         }
         ConsoleUser user = new ConsoleUser();
         user.setId(Ids.id());
+        user.setTenantId(TENANT_ID);
         user.setUsername(username);
         user.setPasswordHash(passwordService.hash(password));
         user.setDisplayName(displayName);
