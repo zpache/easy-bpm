@@ -217,6 +217,8 @@
           <el-button style="flex: 1" @click="openTestDialog">试跑选路</el-button>
           <el-button style="flex: 1" type="primary" @click="saveGateway">完成</el-button>
         </div>
+        <el-button type="danger" plain style="width: 100%; margin-top: 16px; margin-left: 0"
+                   @click="removeGatewayNode">删除该节点</el-button>
       </el-form>
     </el-drawer>
 
@@ -607,6 +609,21 @@ function saveGateway() {
   nodes.value[gatewayIndex.value] = JSON.parse(JSON.stringify(draft))
   gatewayVisible.value = false
   gatewayDraft.value = null
+}
+
+async function removeGatewayNode() {
+  const node = nodes.value[gatewayIndex.value]
+  try {
+    await ElMessageBox.confirm(
+      `确定删除条件分支「${node?.name ?? ''}」？删除后其所有分支及分支内节点一并移除。`,
+      '删除条件分支', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+  } catch {
+    return
+  }
+  nodes.value.splice(gatewayIndex.value, 1)
+  gatewayVisible.value = false
+  gatewayDraft.value = null
+  selectedIndex.value = -1
 }
 
 // ---------- 条件试跑 ----------
