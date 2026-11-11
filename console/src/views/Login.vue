@@ -4,14 +4,7 @@
       <!-- 左侧品牌区 -->
       <div class="brand-side">
         <div class="brand-inner">
-          <div class="brand-logo">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none">
-              <path d="M4 6a2 2 0 1 1 4 0 2 2 0 0 1-4 0Z" fill="#fff" />
-              <path d="M4 18a2 2 0 1 1 4 0 2 2 0 0 1-4 0Z" fill="#fff" />
-              <path d="M16 12a2 2 0 1 1 4 0 2 2 0 0 1-4 0Z" fill="#fff" />
-              <path d="M7 6h5a3 3 0 0 1 3 3v1a2 2 0 0 0 2 2M7 18h5a3 3 0 0 0 3-3v-1a2 2 0 0 1 2-2" stroke="#fff" stroke-width="1.6" stroke-linecap="round" />
-            </svg>
-          </div>
+          <img class="brand-logo" :src="easyBpmLogo" alt="easy-bpm" width="52" height="52" />
           <h1 class="brand-title">easy-bpm</h1>
           <p class="brand-sub">轻量级审批流平台 · 快速接入 ERP / SaaS</p>
           <div class="brand-features">
@@ -65,6 +58,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Lock, OfficeBuilding, User } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import easyBpmLogo from '@/assets/easy-bpm.svg?no-inline'
 
 const router = useRouter()
 const route = useRoute()
@@ -122,14 +116,10 @@ async function onSubmit() {
   color: #fff;
 }
 .brand-logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 52px;
   height: 52px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(4px);
   margin-bottom: 20px;
 }
 .brand-title { font-size: 30px; font-weight: 800; letter-spacing: 1px; }
