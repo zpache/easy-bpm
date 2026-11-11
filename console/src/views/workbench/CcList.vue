@@ -59,23 +59,20 @@
       </el-table-column>
     </el-table>
 
-    <div class="pager">
-      <el-pagination
-        v-model:current-page="page"
-        v-model:page-size="size"
-        :total="total"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="load"
-        @size-change="reload"
-      />
-    </div>
+    <TablePagination
+      v-model:current-page="page"
+      v-model:page-size="size"
+      :total="total"
+      :loading="loading"
+      @change="load"
+    />
   </el-card>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import TablePagination from '@/components/TablePagination.vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import { ccList, markCcRead, workbenchCounts } from '@/api/workbench'
@@ -88,7 +85,7 @@ const tab = ref<'all' | 'unread'>('all')
 const items = ref<CcView[]>([])
 const total = ref(0)
 const page = ref(1)
-const size = ref(10)
+const size = ref(20)
 const keyword = ref('')
 const loading = ref(false)
 const unreadCount = ref(0)
@@ -184,7 +181,6 @@ onMounted(() => {
   background: var(--el-color-danger);
   flex-shrink: 0;
 }
-.pager { display: flex; justify-content: flex-end; margin-top: 14px; }
 :deep(.el-table__row) { cursor: pointer; }
 :deep(.cc-unread-row) { background: #fdf6ec; }
 :deep(.el-table__row.cc-unread-row:hover > td) { background: #faecd8 !important; }

@@ -27,19 +27,19 @@
         <template #default="{ row }">{{ row.traceId || '-' }}</template>
       </el-table-column>
     </el-table>
-    <el-pagination
+    <TablePagination
       v-model:current-page="page"
-      :page-size="size"
+      v-model:page-size="size"
       :total="total"
-      layout="total, prev, pager, next"
-      style="margin-top: 12px"
-      @current-change="load"
+      :loading="loading"
+      @change="load"
     />
   </el-card>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import TablePagination from '@/components/TablePagination.vue'
 import { fmtDateTime } from '@/utils/format'
 import { auditLogs } from '@/api/audit'
 import type { AuditView } from '@/api/types'

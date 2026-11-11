@@ -53,17 +53,13 @@
         </el-table-column>
       </el-table>
 
-      <div class="pager">
-        <el-pagination
-          v-model:current-page="page"
-          v-model:page-size="size"
-          :total="total"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next"
-          @current-change="load"
-          @size-change="reload"
-        />
-      </div>
+      <TablePagination
+        v-model:current-page="page"
+        v-model:page-size="size"
+        :total="total"
+        :loading="loading"
+        @change="load"
+      />
     </el-card>
   </div>
 </template>
@@ -71,6 +67,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import TablePagination from '@/components/TablePagination.vue'
 import { Search } from '@element-plus/icons-vue'
 import { allInstances } from '@/api/workbench'
 import { listFlows } from '@/api/flows'
@@ -132,6 +129,5 @@ onMounted(async () => {
 <style scoped>
 .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.pager { display: flex; justify-content: flex-end; margin-top: 14px; }
 :deep(.el-table__row) { cursor: pointer; }
 </style>
