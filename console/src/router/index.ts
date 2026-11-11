@@ -6,6 +6,12 @@ export const router = createRouter({
   routes: [
     { path: '/login', name: 'login', component: () => import('@/views/Login.vue') },
     {
+      // 企业 SSO 回调页：凭一次性 ticket 换登录态，未登录也可访问
+      path: '/sso/callback',
+      name: 'sso-callback',
+      component: () => import('@/views/SsoCallback.vue'),
+    },
+    {
       path: '/',
       component: () => import('@/layouts/AdminLayout.vue'),
       children: [
@@ -31,6 +37,10 @@ export const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
+  // 回调页自己处理 ticket 兑换，不做登录态重定向（否则 ticket 还没用就被弹回登录页）
+  if (to.name === 'sso-callback') {
+    return true
+  }
   if (to.name !== 'login' && !auth.loggedIn) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }

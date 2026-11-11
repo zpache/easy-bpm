@@ -132,6 +132,8 @@ POST /open/v1/tasks/{id}/approve
 | `bpm_cc` | 抄送 |
 | `bpm_webhook_log` | 回调投递日志（P4） |
 | `bpm_audit_log` | 控制台敏感操作审计（流程/凭证/租户/组织） |
+| `bpm_sso_provider` | 租户级 OIDC IdP 配置（client_secret 加密存储） |
+| `bpm_sso_identity` | 外部身份与本地账号绑定（空绑定 = PENDING 待开通） |
 | `ACT_*` | Flowable 引擎表（自动创建） |
 
 ### 6.1 敏感数据加密（P12）
@@ -143,6 +145,15 @@ POST /open/v1/tasks/{id}/approve
 - **存量升级**：启动时 `SensitiveDataMigration` 用 JdbcTemplate 读取原始值比对，逐行重写为当前密钥密文并补齐盲索引（幂等，未变更行不产生 UPDATE）；
 - **未覆盖**：`bpm_instance.form_data` 属于业务表单，可由接入方自行脱敏后提交；如需整体加密，应在投影层增加加解密列并放弃按表单字段的 SQL 检索。
 
+### 6.2 控制台 SSO（P14）
+
+- **协议**：OIDC 授权码 + PKCE，自研 client（JDK HttpClient + Jackson），不引 `spring-security-oauth2-client`，避免与 `ConsoleAuthFilter` 的 SecurityFilterChain 冲突；
+- **登录态**：SSO 只替换「身份来源」，成功后仍签发同一套本地 JWT，`ConsoleAuthFilter` 与 `TenantContext` 链路不变；
+- **一次性票据**：state（5 分钟，防 CSRF，携带 nonce/PKCE verifier/回跳路径）与 ticket（60 秒、单次消费、换 JWT）存进程内 Map，多副本部署需改 Redis；
+- **账号模型**：`bpm_sso_identity` 的 `console_user_id` 为空表示「IdP 已认证、本地未绑定」，管理员绑定后才允许登录；不做自动建号，也不接受 IdP 的角色 claim 授予权限；
+- **安全边界**：`bpm_sso_provider` / `bpm_sso_identity` 与 `bpm_console_user` 一样移出租户插件自动隔离（授权发生在租户上下文建立之前），所有查询点显式带 `tenant_id`；
+- **未覆盖**：SAML 2.0、SCIM、单点登出（back-channel SLO）、多 IdP 并行。
+
 ## 7. 并发与一致性
 
 - 任务处理用「先查后改」会丢并发，P1 依赖 Flowable 的任务完成语义：任务已被处理时抛 `FlowableObjectNotFoundException`，统一映射为 `43003`。
@@ -151,11 +162,11 @@ POST /open/v1/tasks/{id}/approve
 
 ## 8. 演进方向
 
-已完成：P0 技术验证 → P1 多租户纵切 → P2 驳回/撤回/转交/重提/组织同步 → P3 版本回滚与表单校验 → P4 Webhook/限流/审计 → P5/P10 控制台（含组织维护、平台管理、实例视图、数据看板）→ P6 容器化 → P7 抄送闭环与集成测试 → P8 平台管理员与租户管理 → P9 管理员实例视图与看板 → P11 实时查询（工作台快照 / 增量变更流 / 业务主键反查）→ P12 敏感数据加密与 Java SDK。
+已完成：P0 技术验证 → P1 多租户纵切 → P2 驳回/撤回/转交/重提/组织同步 → P3 版本回滚与表单校验 → P4 Webhook/限流/审计 → P5/P10 控制台（含组织维护、平台管理、实例视图、数据看板）→ P6 容器化 → P7 抄送闭环与集成测试 → P8 平台管理员与租户管理 → P9 管理员实例视图与看板 → P11 实时查询（工作台快照 / 增量变更流 / 业务主键反查）→ P12 敏感数据加密 → P13 Java SDK → P14 控制台 SSO（OIDC + PKCE）。
 
 待建设（按优先级）：
 
 - **通知/实时感知**：已用「轮询查询」覆盖实时待办需求（`/workbench`、`/changes`），接入方无需公网回调；Webhook 仅保留实例结束事件，若需推送新待办/超时提醒可按 `task.created`、`task.overdue` 扩展，属于可选增强而非接入必需；
 - **审批人运行期兜底**：实例运行中审批人离职/停用导致待办卡死的重解析转办（方案见 README 注意事项）；
 - **加签**：审批中临时增补审批人（会签/或签语义需分别定义）；
-- Node SDK、SSO 单点登录、Redis 全局限流（多实例部署时）。
+- Node SDK、Redis 全局限流与分布式会话（多实例部署时，SSO 的 state/ticket 也需迁移）。

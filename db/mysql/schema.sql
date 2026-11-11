@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS bpm_console_user (
     id               VARCHAR(32)  NOT NULL,
     tenant_id        VARCHAR(32)  NOT NULL,
     username         VARCHAR(64)  NOT NULL,
-    password_hash    VARCHAR(256) NOT NULL,
+    password_hash    VARCHAR(256) NULL COMMENT 'SSO 专属账号为空',
+    auth_source      VARCHAR(16)  NOT NULL DEFAULT 'LOCAL' COMMENT 'LOCAL/SSO',
     display_name     VARCHAR(64)  NOT NULL,
     external_user_id VARCHAR(64)  NULL COMMENT '对应组织人员编码，用于待办查询',
     role             VARCHAR(32)  NOT NULL DEFAULT 'MEMBER' COMMENT 'PLATFORM_ADMIN/TENANT_ADMIN/MEMBER',
@@ -228,3 +229,44 @@ CREATE TABLE IF NOT EXISTS bpm_audit_log (
     KEY idx_audit_tenant (tenant_id, created_at),
     KEY idx_audit_action (tenant_id, action, created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '控制台操作审计';
+
+CREATE TABLE IF NOT EXISTS bpm_sso_provider (
+    id            VARCHAR(32)  NOT NULL,
+    tenant_id     VARCHAR(32)  NOT NULL,
+    code          VARCHAR(32)  NOT NULL DEFAULT 'default' COMMENT '租户内提供方编码，M1 固定 default',
+    name          VARCHAR(128) NOT NULL COMMENT '登录页展示名称，如「企业微信」',
+    protocol      VARCHAR(16)  NOT NULL DEFAULT 'OIDC',
+    issuer        VARCHAR(512) NOT NULL COMMENT 'OIDC issuer，用于 discovery 与 iss 校验',
+    client_id     VARCHAR(191) NOT NULL,
+    client_secret VARCHAR(512) NOT NULL COMMENT 'AES-256-GCM 密文',
+    scopes        VARCHAR(255) NOT NULL DEFAULT 'openid profile email',
+    redirect_uri  VARCHAR(512) NULL COMMENT '空则用 easybpm.sso.default-redirect-uri',
+    name_claim    VARCHAR(64)  NULL COMMENT '自定义姓名字段名，空则按常见 claim 兜底',
+    email_claim   VARCHAR(64)  NULL,
+    status        VARCHAR(16)  NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE/DISABLED',
+    auto_provision TINYINT     NOT NULL DEFAULT 0 COMMENT 'M1 固定 0：认证通过但未绑定则拒绝',
+    default_role  VARCHAR(32)  NOT NULL DEFAULT 'MEMBER',
+    created_at    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_sso_provider (tenant_id, code)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '租户 SSO 身份提供方';
+
+CREATE TABLE IF NOT EXISTS bpm_sso_identity (
+    id               VARCHAR(32)  NOT NULL,
+    tenant_id        VARCHAR(32)  NOT NULL,
+    provider_id      VARCHAR(32)  NOT NULL,
+    subject          VARCHAR(191) NOT NULL COMMENT 'IdP 的 sub，只在 issuer 内唯一',
+    issuer           VARCHAR(512) NULL,
+    console_user_id  VARCHAR(32)  NULL COMMENT '空表示已认证但未绑定本地账号',
+    external_user_id VARCHAR(64)  NULL,
+    email            VARCHAR(255) NULL COMMENT '来自 IdP claim，仅供管理员识别',
+    display_name     VARCHAR(128) NULL,
+    status           VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/ACTIVE/DISABLED',
+    last_attempt_at  DATETIME(3)  NULL,
+    last_login_at    DATETIME(3)  NULL,
+    created_at       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_sso_identity (provider_id, subject),
+    KEY idx_sso_identity_tenant (tenant_id, status)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '外部身份与本地账号绑定';

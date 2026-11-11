@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS bpm_console_user (
     tenant_id        VARCHAR(32)  NOT NULL,
     username         VARCHAR(64)  NOT NULL,
     password_hash    VARCHAR(256) NOT NULL,
+    auth_source      VARCHAR(16)  NOT NULL DEFAULT 'LOCAL',
     display_name     VARCHAR(64)  NOT NULL,
     external_user_id VARCHAR(64)  NULL,
     role             VARCHAR(32)  NOT NULL DEFAULT 'MEMBER',
@@ -210,4 +211,44 @@ CREATE TABLE IF NOT EXISTS bpm_audit_log (
     trace_id      VARCHAR(64)  NULL,
     created_at    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS bpm_sso_provider (
+    id             VARCHAR(32)  NOT NULL,
+    tenant_id      VARCHAR(32)  NOT NULL,
+    code           VARCHAR(32)  NOT NULL DEFAULT 'default',
+    name           VARCHAR(128) NOT NULL,
+    protocol       VARCHAR(16)  NOT NULL DEFAULT 'OIDC',
+    issuer         VARCHAR(512) NOT NULL,
+    client_id      VARCHAR(191) NOT NULL,
+    client_secret  VARCHAR(512) NOT NULL,
+    scopes         VARCHAR(255) NOT NULL DEFAULT 'openid profile email',
+    redirect_uri   VARCHAR(512) NULL,
+    name_claim     VARCHAR(64)  NULL,
+    email_claim    VARCHAR(64)  NULL,
+    status         VARCHAR(16)  NOT NULL DEFAULT 'ACTIVE',
+    auto_provision TINYINT      NOT NULL DEFAULT 0,
+    default_role   VARCHAR(32)  NOT NULL DEFAULT 'MEMBER',
+    created_at     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_sso_provider UNIQUE (tenant_id, code)
+);
+
+CREATE TABLE IF NOT EXISTS bpm_sso_identity (
+    id               VARCHAR(32)  NOT NULL,
+    tenant_id        VARCHAR(32)  NOT NULL,
+    provider_id      VARCHAR(32)  NOT NULL,
+    subject          VARCHAR(191) NOT NULL,
+    issuer           VARCHAR(512) NULL,
+    console_user_id  VARCHAR(32)  NULL,
+    external_user_id VARCHAR(64)  NULL,
+    email            VARCHAR(255) NULL,
+    display_name     VARCHAR(128) NULL,
+    status           VARCHAR(16)  NOT NULL DEFAULT 'PENDING',
+    last_attempt_at  TIMESTAMP(3) NULL,
+    last_login_at    TIMESTAMP(3) NULL,
+    created_at       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_sso_identity UNIQUE (provider_id, subject)
 );

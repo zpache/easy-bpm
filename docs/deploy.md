@@ -56,6 +56,9 @@ docker compose up -d --build
 | `EASY_BPM_DATA_KEY_PREVIOUS` | 密钥轮换时的旧密钥，仅用于解密 | 空 |
 | `EASY_BPM_WEBHOOK_ENABLED` | Webhook 回调开关 | `true` |
 | `EASY_BPM_RATE_LIMIT` | OpenAPI 限流（次/分钟，按 AppKey，0 关闭） | `600` |
+| `EASY_BPM_SSO_ENABLED` | 控制台单点登录开关 | `true` |
+| `EASY_BPM_CONSOLE_BASE_URL` | 控制台外部地址（SSO 回调后跳回） | `http://localhost:8091` |
+| `EASY_BPM_SSO_REDIRECT_URI` | IdP 回调地址，需与 IdP 侧登记值一致 | `http://localhost:8091/api/auth/sso/callback` |
 
 ### 3.2 Webhook 回调（P4）
 
@@ -98,6 +101,29 @@ docker compose up -d --build
 
 > 密钥一旦丢失，已加密的手机号/邮箱/AppSecret 不可恢复（需重新同步组织、轮换凭证）。请与数据库备份分开保管。
 
+### 3.6 控制台单点登录（P14）
+
+控制台支持 OIDC 单点登录（授权码 + PKCE），与密码登录并存，配置与排错详见 **[sso.md](sso.md)**。
+
+| 变量 | 说明 | 默认 |
+|---|---|---|
+| `EASY_BPM_SSO_ENABLED` | 总开关；关闭后登录页不再探测，授权接口直接拒绝 | `true` |
+| `EASY_BPM_CONSOLE_BASE_URL` | 控制台对外地址，回调成功后跳回这里 | `http://localhost:8091` |
+| `EASY_BPM_SSO_REDIRECT_URI` | 默认回调地址，**必须与 IdP 登记值完全一致**；租户配置可覆盖 | `.../api/auth/sso/callback` |
+
+上线步骤：
+
+1. 执行 `db/migrations/2026-11-11_p14_sso.sql`（`bpm_console_user` 加 `auth_source`、`password_hash` 允许为空，新建两张 SSO 表）；
+2. 配好上面三个变量，**生产必须使用 https 外部域名**（IdP 通常拒绝 http 回调）；
+3. 平台管理员在「平台管理 → 租户 → SSO」填 Issuer / Client ID / Client Secret，点「测试连接」；
+4. 员工首次点「企业登录」后出现在「企业身份 → 待绑定」，管理员绑定本地账号后生效。
+
+注意事项：
+
+- **必须保留逃生通道**：不要把全部管理员都设为 SSO 专属；平台管理员账号禁止 SSO 专属（接口已拦截），否则 IdP 故障时无法进入平台管理；
+- **多副本部署**：state / ticket 存在进程内存，多实例时需要会话粘滞或改 Redis，否则回调可能落到没有 state 的实例（表现为 `STATE_INVALID`）；
+- 登录页探测只暴露展示名，不泄漏 issuer / clientId；日志里也只记录 provider 编码与 subject。
+
 ## 4. 运维手册
 
 ### 4.1 建库与初始化
@@ -123,6 +149,7 @@ docker exec -i easy-bpm-mysql mysql -uroot -p$EASY_BPM_DB_PASSWORD easy_bpm < db
 - [ ] `EASY_BPM_JWT_SECRET` 已替换为强随机值，且未入库 git
 - [ ] `EASY_BPM_DATA_KEY` 已配置为独立随机值，并与数据库备份分开保管
 - [ ] 已执行 `db/migrations/2026-11-11_p12_sensitive_data.sql`，启动日志无「解密失败」
+- [ ] 启用 SSO 时已执行 `2026-11-11_p14_sso.sql`，回调地址为 https 且与 IdP 一致，并保留至少一个可密码登录的管理员
 - [ ] 数据库密码强随机，`.env` 权限 600
 - [ ] 演示数据确认关闭（prod profile 默认 `easybpm.demo.enabled=false`）
 - [ ] Swagger 仅内网可达（或在 nginx 层封禁 `/swagger-ui`、`/v3/api-docs`）

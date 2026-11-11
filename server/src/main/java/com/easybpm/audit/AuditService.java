@@ -26,12 +26,28 @@ public class AuditService {
 
     public void record(String action, String targetType, String targetId, String detail) {
         try {
+            var principal = CurrentUser.get();
+            recordAs(TenantContext.require(),
+                    principal == null ? "unknown" : principal.approverId(),
+                    principal == null ? null : principal.displayName(),
+                    action, targetType, targetId, detail);
+        } catch (Exception e) {
+            log.warn("审计写入失败 action={} target={}", action, targetId, e);
+        }
+    }
+
+    /**
+     * 显式指定租户与操作人。用于 SSO 回调这类「登录前置」流程：
+     * 此时 TenantContext 与 CurrentUser 都为空，无法从上下文推断。
+     */
+    public void recordAs(String tenantId, String operatorId, String operatorName,
+                         String action, String targetType, String targetId, String detail) {
+        try {
             BpmAuditLog entry = new BpmAuditLog();
             entry.setId(Ids.id());
-            entry.setTenantId(TenantContext.require());
-            var principal = CurrentUser.get();
-            entry.setOperatorId(principal == null ? "unknown" : principal.approverId());
-            entry.setOperatorName(principal == null ? null : principal.displayName());
+            entry.setTenantId(tenantId);
+            entry.setOperatorId(operatorId == null || operatorId.isBlank() ? "unknown" : operatorId);
+            entry.setOperatorName(operatorName);
             entry.setAction(action);
             entry.setTargetType(targetType);
             entry.setTargetId(targetId);

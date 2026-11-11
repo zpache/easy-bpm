@@ -46,6 +46,22 @@
               登 录
             </el-button>
           </el-form>
+
+          <template v-if="ssoProviders.length">
+            <div class="sso-divider"><span>或</span></div>
+            <el-button
+              v-for="provider in ssoProviders"
+              :key="provider.code"
+              size="large"
+              class="sso-btn"
+              :loading="ssoLoading"
+              @click="onSso(provider)"
+            >
+              <el-icon style="margin-right: 6px"><Connection /></el-icon>
+              使用 {{ provider.name }} 登录
+            </el-button>
+            <p class="sso-hint">企业账号由所属组织统一认证，无需在平台输入密码</p>
+          </template>
         </div>
       </div>
     </div>
@@ -53,18 +69,71 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Lock, OfficeBuilding, User } from '@element-plus/icons-vue'
+import { Connection, Lock, OfficeBuilding, User } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { listSsoProviders } from '@/api/sso'
+import type { SsoProviderBrief } from '@/api/sso'
 import easyBpmLogo from '@/assets/easy-bpm.svg?no-inline'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const loading = ref(false)
+const ssoLoading = ref(false)
+const ssoProviders = ref<SsoProviderBrief[]>([])
 const form = reactive({ tenantCode: 'demo', username: 'admin', password: '' })
+
+let detectTimer: ReturnType<typeof setTimeout> | undefined
+
+/** 按租户编码探测是否启用企业登录；失败静默降级为密码登录 */
+async function detectSso() {
+  const tenantCode = form.tenantCode.trim()
+  ssoProviders.value = []
+  if (!tenantCode) return
+  try {
+    ssoProviders.value = await listSsoProviders(tenantCode)
+  } catch {
+    ssoProviders.value = []
+  }
+}
+
+function scheduleDetect() {
+  if (detectTimer) clearTimeout(detectTimer)
+  detectTimer = setTimeout(detectSso, 400)
+}
+
+function onSso(provider: SsoProviderBrief) {
+  const tenantCode = form.tenantCode.trim()
+  if (!tenantCode) {
+    ElMessage.warning('请先填写租户编码')
+    return
+  }
+  ssoLoading.value = true
+  const params = new URLSearchParams({ tenantCode, provider: provider.code })
+  const redirect = route.query.redirect as string | undefined
+  if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    params.set('redirect', redirect)
+  }
+  // 交给浏览器整页跳转：先到后端 /authorize，再由后端 302 到企业 IdP
+  window.location.href = `/api/auth/sso/authorize?${params.toString()}`
+}
+
+onMounted(() => {
+  detectSso()
+  const ssoError = route.query.error as string | undefined
+  const ssoMessage = route.query.message as string | undefined
+  if (ssoError) {
+    ElMessage.error(ssoMessage || '企业登录未完成，请重试或使用密码登录')
+  }
+})
+
+watch(() => form.tenantCode, scheduleDetect)
+onBeforeUnmount(() => {
+  if (detectTimer) clearTimeout(detectTimer)
+})
 
 async function onSubmit() {
   if (!form.tenantCode || !form.username || !form.password) {
@@ -159,6 +228,23 @@ async function onSubmit() {
 .form-title { font-size: 22px; font-weight: 700; color: #1f2937; }
 .form-sub { margin: 8px 0 28px; font-size: 13px; color: #909399; }
 .login-btn { width: 100%; margin-top: 4px; letter-spacing: 4px; }
+.sso-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 16px;
+  color: #c0c4cc;
+  font-size: 12px;
+}
+.sso-divider::before,
+.sso-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #ebeef5;
+}
+.sso-btn { width: 100%; letter-spacing: 0; }
+.sso-hint { margin: 12px 0 0; font-size: 12px; line-height: 1.6; color: #a8abb2; text-align: center; }
 
 @media (max-width: 768px) {
   .brand-side { display: none; }

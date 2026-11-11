@@ -38,6 +38,7 @@ easy-bpm/
 ├─ server/                       # Spring Boot 服务
 │  ├─ src/main/java/com/easybpm/
 │  │  ├─ auth/                   # 控制台登录、OpenAPI 鉴权过滤器
+│  │  │  └─ sso/                 # 控制台 OIDC 单点登录（配置、授权、绑定）
 │  │  ├─ tenant/                 # 租户上下文、租户与凭证
 │  │  ├─ org/                    # 组织、角色（审批人解析数据源）
 │  │  ├─ flow/                   # 审批链模型、JSON→BPMN 编译器、定义管理
@@ -53,6 +54,7 @@ easy-bpm/
    ├─ architecture.md            # 架构说明（分层、多租户、编译链路、数据表）
    ├─ integration.md             # 接入指南（签名、接口、错误码）
    ├─ sdk-java.md                # Java SDK 使用手册
+   ├─ sso.md                     # 控制台单点登录（OIDC 配置、绑定、排错）
    ├─ deploy.md                  # 部署与运维（Docker、环境变量、回调配置）
    ├─ console.md                 # 控制台使用手册（含页面截图）
    └─ images/                    # 控制台截图
@@ -275,6 +277,15 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 - `ChangePoller` 一条链把游标推进、`hasMore` 续拉、`eventId` 去重、失败退避都做完，等于「没有 Webhook 的实时待办」；
 - 用法见 `docs/sdk-java.md`，方法对照表覆盖 `docs/integration.md` 的全部接口。
 
+### 12. 控制台单点登录（OIDC）
+
+- 走标准 OIDC 授权码 + PKCE，没引 `spring-security-oauth2-client`：那套会注册自己的 SecurityFilterChain，与现有 `ConsoleAuthFilter` 的时序打架；自研 client 只依赖 JDK HttpClient + Jackson（`auth/sso/OidcClient`）；
+- 登录态不变：回调先换一次性 ticket，前端再用 ticket 换本地 JWT，**token 不进 URL**，`ConsoleAuthFilter` 一行未改；
+- 账号默认拒绝：IdP 认证通过但没有绑定关系时只登记 `PENDING` 身份，管理员在「平台管理 → SSO → 企业身份」里绑定本地账号后才可登录；这样即使 IdP 侧任何人都能认证，也进不了控制台；
+- 权限天花板：SSO 只能登录到已存在的控制台账号，IdP 的组/角色 claim 不参与授权，永远拿不到 `PLATFORM_ADMIN`；
+- 安全项：state 一次性 + nonce + PKCE、JWKS 按 kid 验签并支持轮换、aud/iss/exp 全校验、回跳路径只允许站内相对地址、`client_secret` 复用 `DataCipher` 加密落库且接口只返回掩码；
+- 配置只在平台侧开放（租户管理员能改 IdP 就等于能接管账号）；详见 `docs/sso.md`。
+
 ## 阶段计划
 
 | 阶段 | 内容 | 状态 |
@@ -294,6 +305,7 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | P11 | 实时查询：工作台快照、增量变更流（待办/已办/抄送/实例状态）、业务主键反查（免 Webhook 轮询接入） | ✅ |
 | P12 | 敏感数据加密（手机号/邮箱/AppSecret，AES-256-GCM + 盲索引 + 存量迁移） | ✅ |
 | P13 | Java SDK（`sdk-java/`）：签名鉴权、审批闭环、工作台快照、增量轮询器、组织同步 | ✅ |
+| P14 | 控制台 SSO（OIDC 授权码 + PKCE）：租户 IdP 配置、待绑定管理、与密码登录并存 | ✅ |
 
 ## 测试
 
