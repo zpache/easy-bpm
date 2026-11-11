@@ -147,7 +147,8 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 主管继承规则：「直属主管」类审批节点解析时，人员显式设置的 leaderCode 优先；未设置时自动继承所在部门的主管（本部门未设则沿上级部门逐级向上查找第一个配置了主管的部门），部门主管是本人时跳过本级继续向上，避免自审批。仅跨部门汇报线需要显式指定直属主管。
 | GET | `/tenant/info` | 当前租户信息 |
 | GET/POST | `/tenant/credentials` | 凭证列表（Secret 掩码）/ 新建（Secret 仅此一次完整返回） |
-| GET/POST | `/platform/tenants` | 平台管理员：租户列表（含账号/凭证/流程/实例统计）/ 新建租户（可带初始管理员） |
+| GET | `/platform/tenants?page=1&size=20&keyword=` | 平台管理员：租户分页列表，支持编码/名称/备注搜索（忽略大小写），每页最多 100 条，返回 list/total/page/size，含当前页租户统计 |
+| POST | `/platform/tenants` | 平台管理员：新建租户（可带初始管理员） |
 | POST | `/platform/tenants/{id}` | 编辑租户名称与备注 |
 | POST | `/platform/tenants/{id}/disable\|enable` | 停用 / 启用租户（停用后该租户控制台登录与 OpenAPI 全部拒绝） |
 | POST | `/platform/tenants/{id}/switch` | 平台管理员切换进入目标租户（签发临时 token，前端可一键返回平台视角） |

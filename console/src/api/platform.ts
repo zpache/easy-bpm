@@ -1,8 +1,14 @@
 import http from '@/api/request'
-import type { PlatformTenantView, PlatformTenantSwitch } from './types'
+import type { PageResult, PlatformTenantView, PlatformTenantSwitch } from './types'
 
-export function listTenants() {
-  return http.get<never, PlatformTenantView[]>('/api/platform/tenants')
+export interface TenantListParams {
+  page?: number
+  size?: number
+  keyword?: string
+}
+
+export function listTenants(params: TenantListParams = {}) {
+  return http.get<never, PageResult<PlatformTenantView>>('/api/platform/tenants', { params })
 }
 
 export interface CreateTenantPayload {

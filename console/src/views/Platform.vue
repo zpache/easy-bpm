@@ -18,13 +18,16 @@
               clearable
               style="width: 240px; margin-right: 12px"
               :prefix-icon="Search"
+              @keyup.enter="reload"
+              @clear="reload"
             />
+            <el-button @click="reload">搜索</el-button>
             <el-button type="primary" @click="openCreate">新建租户</el-button>
           </div>
         </div>
       </template>
 
-      <el-table :data="filtered" v-loading="loading">
+      <el-table :data="tenants" v-loading="loading">
         <template #empty><el-empty description="暂无租户" :image-size="80" /></template>
         <el-table-column prop="code" label="租户编码" width="160">
           <template #default="{ row }">
@@ -68,6 +71,18 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pager">
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="size"
+          :total="total"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next"
+          @current-change="load"
+          @size-change="reload"
+        />
+      </div>
     </el-card>
 
     <!-- 新建租户 -->
@@ -126,7 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
@@ -141,30 +156,43 @@ const tenants = ref<PlatformTenantView[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const keyword = ref('')
+const page = ref(1)
+const size = ref(20)
+const total = ref(0)
 const createVisible = ref(false)
 const editVisible = ref(false)
 const editing = ref<PlatformTenantView | null>(null)
 const createForm = reactive({ code: '', name: '', adminUsername: '', adminPassword: '', adminDisplayName: '', remark: '' })
 const editForm = reactive({ name: '', remark: '' })
 
-const filtered = computed(() => {
-  const kw = keyword.value.trim().toLowerCase()
-  if (!kw) return tenants.value
-  return tenants.value.filter(
-    (t) =>
-      t.code.toLowerCase().includes(kw) ||
-      t.name.toLowerCase().includes(kw) ||
-      (t.remark || '').toLowerCase().includes(kw),
-  )
-})
+let loadSequence = 0
 
 async function load() {
+  const sequence = ++loadSequence
   loading.value = true
   try {
-    tenants.value = await listTenants()
+    const result = await listTenants({
+      page: page.value,
+      size: size.value,
+      keyword: keyword.value.trim() || undefined,
+    })
+    if (sequence !== loadSequence) return
+    const lastPage = Math.max(1, Math.ceil(result.total / size.value))
+    if (page.value > lastPage) {
+      page.value = lastPage
+      await load()
+      return
+    }
+    tenants.value = result.list
+    total.value = result.total
   } finally {
-    loading.value = false
+    if (sequence === loadSequence) loading.value = false
   }
+}
+
+async function reload() {
+  page.value = 1
+  await load()
 }
 
 function openCreate() {
@@ -198,7 +226,7 @@ async function onCreate() {
     })
     createVisible.value = false
     ElMessage.success('租户创建成功')
-    await load()
+    await reload()
   } finally {
     saving.value = false
   }
@@ -266,4 +294,5 @@ onMounted(load)
 .toolbar-right { display: flex; align-items: center; }
 .code-cell { font-family: 'SFMono-Regular', Consolas, Menlo, monospace; }
 .switch-alert { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pager { display: flex; justify-content: flex-end; margin-top: 12px; }
 </style>
