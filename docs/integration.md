@@ -456,6 +456,43 @@ GET /open/v1/instances/by-business-key?businessKey=LEAVE-2026-0001 # 用自己�
 }
 ```
 
+### 条件网关（排他分支）
+
+节点 `type: "CONDITION"` 表示按业务数据选路：分支按声明顺序 FIRST-MATCH，命中第一个满足条件的分支后走该分支的子节点链，其余分支不进入；**条件留空的分支即默认分支**（必须存在且放在最后），所有条件都不满足时走它。
+
+```json
+{
+  "id": "gw1",
+  "type": "CONDITION",
+  "name": "金额分支",
+  "branches": [
+    {
+      "name": "大额",
+      "condition": "amount > 10000",
+      "nodes": [
+        { "id": "n_big", "type": "APPROVAL", "name": "总监审批",
+          "props": { "approverType": "DEPT_LEADER", "mode": "ANY" } }
+      ]
+    },
+    {
+      "name": "默认",
+      "condition": null,
+      "nodes": [
+        { "id": "n_normal", "type": "APPROVAL", "name": "主管审批",
+          "props": { "approverType": "INITIATOR_LEADER", "leaderLevel": 1, "mode": "ANY" } }
+      ]
+    }
+  ]
+}
+```
+
+约束与语义：
+
+- 分支条件与节点条件一样是 SpEL（见下节「条件」），但**在运行时到达网关那一刻**用实例当前变量求值——审批环节补充提交的 formData 也会参与选路；
+- 分支内允许 APPROVAL / CC 及带跳过条件的节点，不允许嵌套第二个网关；
+- 分支内节点的审批人同样在发起时解析校验（`emptyStrategy: FAIL` 的节点审批人为空会拦截发起，即使该分支最终未被选中）；
+- 编译为 Flowable 原生排他网关，分支汇聚后回到主链继续。
+
 ### 审批人来源
 
 | `approverType` | 必填字段 | 说明 |

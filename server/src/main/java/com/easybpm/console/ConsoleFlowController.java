@@ -7,9 +7,13 @@ import com.easybpm.common.BizException;
 import com.easybpm.common.ErrorCode;
 import com.easybpm.common.JsonCodec;
 import com.easybpm.common.PageResult;
+import com.easybpm.engine.BpmInstance;
+import com.easybpm.engine.BpmInstanceMapper;
+import com.easybpm.engine.ConditionEvaluator;
 import com.easybpm.flow.FlowDefinition;
 import com.easybpm.flow.FlowDefinitionService;
 import com.easybpm.flow.FlowVersion;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -22,7 +26,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 控制台的流程定义管理。写入操作要求租户管理员。
@@ -34,11 +43,16 @@ public class ConsoleFlowController {
     private final FlowDefinitionService definitions;
     private final JsonCodec json;
     private final AuditService audit;
+    private final BpmInstanceMapper instanceMapper;
+    private final ConditionEvaluator conditionEvaluator;
 
-    public ConsoleFlowController(FlowDefinitionService definitions, JsonCodec json, AuditService audit) {
+    public ConsoleFlowController(FlowDefinitionService definitions, JsonCodec json, AuditService audit,
+                                 BpmInstanceMapper instanceMapper, ConditionEvaluator conditionEvaluator) {
         this.definitions = definitions;
         this.json = json;
         this.audit = audit;
+        this.instanceMapper = instanceMapper;
+        this.conditionEvaluator = conditionEvaluator;
     }
 
     @GetMapping
@@ -127,6 +141,94 @@ public class ConsoleFlowController {
     @GetMapping("/{code}/versions")
     public ApiResponse<List<VersionView>> versions(@PathVariable String code) {
         return ApiResponse.ok(definitions.versions(code).stream().map(this::toVersionView).toList());
+    }
+
+    /**
+     * 该流程历史实例 formData 的顶层字段聚合（近 100 条），供条件分支配置时自动补全字段键。
+     * 无表单设计器，字段元数据只能从业务方实际提交的数据里来。
+     */
+    @GetMapping("/{code}/form-fields")
+    public ApiResponse<List<FormFieldView>> formFields(@PathVariable String code) {
+        requireAdmin();
+        definitions.require(code);
+        List<BpmInstance> recent = instanceMapper.selectList(new LambdaQueryWrapper<BpmInstance>()
+                .eq(BpmInstance::getFlowCode, code)
+                .select(BpmInstance::getFormData)
+                .orderByDesc(BpmInstance::getStartedAt)
+                .last("limit 100"));
+
+        Map<String, FieldAgg> fields = new LinkedHashMap<>();
+        for (BpmInstance instance : recent) {
+            if (instance.getFormData() == null || instance.getFormData().isBlank()) {
+                continue;
+            }
+            Map<String, Object> data = json.readMap(instance.getFormData());
+            data.forEach((key, value) -> fields.computeIfAbsent(key, k -> new FieldAgg())
+                    .observe(value));
+        }
+        return ApiResponse.ok(fields.entrySet().stream()
+                .map(e -> new FormFieldView(e.getKey(), e.getValue().type, e.getValue().samples))
+                .toList());
+    }
+
+    /**
+     * 条件试跑：用样例 formData 逐一求值表达式，返回各自命中结果与第一个命中的下标，
+     * 供设计器在发布前验证网关选路（FIRST-MATCH 语义）。
+     */
+    @PostMapping("/{code}/condition-test")
+    public ApiResponse<ConditionTestResult> conditionTest(@PathVariable String code,
+                                                          @Valid @RequestBody ConditionTestRequest request) {
+        requireAdmin();
+        definitions.require(code);
+        Map<String, Object> variables = request.formData() == null ? Map.of() : request.formData();
+        List<Boolean> matched = new ArrayList<>();
+        int firstMatch = -1;
+        for (int i = 0; i < request.expressions().size(); i++) {
+            String expression = request.expressions().get(i);
+            boolean hit;
+            try {
+                hit = expression != null && !expression.isBlank()
+                        && conditionEvaluator.evaluate(expression, variables, "试跑表达式 " + (i + 1));
+            } catch (RuntimeException e) {
+                // 求值异常按不命中处理，但把原因带回给前端展示
+                hit = false;
+            }
+            if (hit && firstMatch < 0) {
+                firstMatch = i;
+            }
+            matched.add(hit);
+        }
+        return ApiResponse.ok(new ConditionTestResult(matched, firstMatch));
+    }
+
+    private static final class FieldAgg {
+        private final Set<String> types = new LinkedHashSet<>();
+        private final List<Object> samples = new ArrayList<>();
+        private String type = "string";
+
+        void observe(Object value) {
+            types.add(inferType(value));
+            if (samples.size() < 3) {
+                samples.add(value);
+            }
+        }
+
+        private String inferType(Object value) {
+            if (value instanceof Number) return "number";
+            if (value instanceof Boolean) return "boolean";
+            if (value instanceof List) return "array";
+            if (value instanceof Map) return "object";
+            return "string";
+        }
+    }
+
+    public record FormFieldView(String key, String type, List<Object> samples) {
+    }
+
+    public record ConditionTestRequest(Map<String, Object> formData, @NotNull List<String> expressions) {
+    }
+
+    public record ConditionTestResult(List<Boolean> matched, int firstMatchIndex) {
     }
 
     private void requireAdmin() {

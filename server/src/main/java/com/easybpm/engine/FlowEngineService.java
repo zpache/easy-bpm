@@ -403,9 +403,7 @@ public class FlowEngineService {
             return RejectStrategy.TO_END;
         }
         FlowSchema schema = json.read(definition.getFlowSchema(), FlowSchema.class);
-        return schema.nodes().stream()
-                .filter(n -> nodeId.equals(n.id()))
-                .findFirst()
+        return schema.findNode(nodeId)
                 .map(n -> n.props() == null ? RejectStrategy.TO_END : n.props().rejectOrDefault())
                 .orElse(RejectStrategy.TO_END);
     }
@@ -460,7 +458,11 @@ public class FlowEngineService {
 
         Set<String> autoPassNodes = new LinkedHashSet<>();
         Set<String> autoRejectNodes = new LinkedHashSet<>();
-        List<FlowNode> nodes = schema.nodes().subList(1, schema.nodes().size() - 1);
+        // 扁平化遍历：含网关分支内的子节点。网关分支条件在运行时由引擎内联求值，这里只处理节点级跳过条件；
+        // 分支内节点的审批人同样在发起时解析（未选中的分支其变量闲置，选中分支无需二次解析）。
+        List<FlowNode> nodes = schema.flatNodes().stream()
+                .filter(n -> n.type() != NodeType.START && n.type() != NodeType.END && !n.isGateway())
+                .toList();
         for (FlowNode node : nodes) {
             if (node.condition() != null && !node.condition().isBlank()) {
                 variables.put("cond_" + node.id(), conditionEvaluator.evaluate(node.condition(), variables, node.name()));
@@ -680,7 +682,12 @@ public class FlowEngineService {
         Map<String, Object> variables = new LinkedHashMap<>(command.formData());
         variables.put("initiatorId", command.initiatorId());
         variables.put("initiatorDeptCode", command.initiatorDeptCode());
-        for (FlowNode node : schema.nodes().subList(1, schema.nodes().size() - 1)) {
+        // 与 resolveVariables 同口径：扁平化遍历（含网关分支），分支内 FAIL 策略节点审批人为空同样拦截发起，
+        // 避免分支被选中后才发现无审批人
+        List<FlowNode> nodes = schema.flatNodes().stream()
+                .filter(n -> n.type() == NodeType.APPROVAL || n.type() == NodeType.CC)
+                .toList();
+        for (FlowNode node : nodes) {
             if (node.type() == NodeType.APPROVAL
                     && (node.condition() == null || conditionEvaluator.evaluate(node.condition(), variables, node.name()))) {
                 List<String> approvers = approverResolver.resolve(node, command, variables);
