@@ -429,8 +429,8 @@ function canInsertAfter(index: number): boolean {
   if (!auth.isTenantAdmin) return false
   const node = nodes.value[index]
   const next = nodes.value[index + 1]
-  // 非发起人、非结束节点且后面还有节点即可插入；END 自身不显示加号
-  return !!node && !!next && node.type !== 'START' && node.type !== 'END'
+  // 除结束节点外任意节点之后均可插入；END 自身不显示加号
+  return !!node && !!next && node.type !== 'END'
 }
 
 function insertAfter(index: number, type: 'APPROVAL' | 'CC' | 'CONDITION' = 'APPROVAL') {
