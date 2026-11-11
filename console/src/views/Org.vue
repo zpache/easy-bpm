@@ -123,11 +123,11 @@
 
     <!-- 人员编辑 -->
     <el-dialog v-model="userVisible" :title="editingUserCode ? '编辑人员' : '新增人员'" width="540px" :close-on-click-modal="false">
-      <el-form :model="userForm" label-width="90px">
-        <el-form-item label="人员编码" required>
+      <el-form ref="userFormRef" :model="userForm" :rules="userRules" label-width="90px">
+        <el-form-item label="人员编码" prop="userCode">
           <el-input v-model="userForm.userCode" :disabled="!!editingUserCode" placeholder="全局唯一，创建后不可改" maxlength="64" />
         </el-form-item>
-        <el-form-item label="姓名" required>
+        <el-form-item label="姓名" prop="name">
           <el-input v-model="userForm.name" maxlength="64" />
         </el-form-item>
         <el-form-item label="部门">
@@ -157,7 +157,7 @@
             <el-radio value="INACTIVE">离职</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="角色">
+        <el-form-item label="角色" prop="roleCodes">
           <el-select v-model="userForm.roleCodes" multiple filterable allow-create default-first-option
                      placeholder="输入或选择角色编码，可创建新角色" style="width: 100%">
             <el-option v-for="r in roles" :key="r.roleCode" :label="`${r.roleCode}(${r.userCount}人)`" :value="r.roleCode" />
@@ -172,11 +172,11 @@
 
     <!-- 部门编辑 -->
     <el-dialog v-model="deptVisible" :title="editingDeptCode ? '编辑部门' : '新增部门'" width="480px" :close-on-click-modal="false">
-      <el-form :model="deptForm" label-width="90px">
-        <el-form-item label="部门编码" required>
+      <el-form ref="deptFormRef" :model="deptForm" :rules="deptRules" label-width="90px">
+        <el-form-item label="部门编码" prop="deptCode">
           <el-input v-model="deptForm.deptCode" :disabled="!!editingDeptCode" placeholder="全局唯一，创建后不可改" maxlength="64" />
         </el-form-item>
-        <el-form-item label="部门名称" required>
+        <el-form-item label="部门名称" prop="name">
           <el-input v-model="deptForm.name" maxlength="128" />
         </el-form-item>
         <el-form-item label="上级部门">
@@ -201,10 +201,18 @@
     </el-dialog>
 
     <!-- 角色分配 -->
-    <el-dialog v-model="assignVisible" :title="`分配角色：${assigningRole?.roleCode || ''}`" width="480px" :close-on-click-modal="false">
-      <el-select v-model="assignUserCodes" multiple filterable placeholder="选择授权人员" style="width: 100%">
-        <el-option v-for="u in allUsers" :key="u.userCode" :label="`${u.name}(${u.userCode})`" :value="u.userCode" />
-      </el-select>
+    <el-dialog v-model="assignVisible" :title="`分配角色：${assignForm.roleCode}`" width="480px" :close-on-click-modal="false">
+      <el-form ref="assignFormRef" :model="assignForm" :rules="assignRules" label-width="90px">
+        <el-form-item label="角色编码" prop="roleCode">
+          <el-input v-model="assignForm.roleCode" disabled />
+        </el-form-item>
+        <el-form-item label="授权人员">
+          <el-select v-model="assignForm.userCodes" multiple filterable placeholder="选择授权人员" style="width: 100%">
+            <el-option v-for="u in allUsers" :key="u.userCode" :label="`${u.name}(${u.userCode})`" :value="u.userCode" />
+          </el-select>
+          <div class="field-tip">可留空，保存后将移除该角色的全部成员</div>
+        </el-form-item>
+      </el-form>
       <template #footer>
         <el-button @click="assignVisible = false">取消</el-button>
         <el-button type="primary" :loading="saving" @click="onAssign">保存</el-button>
@@ -214,8 +222,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import type { FormInstance, FormItemRule, FormRules } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import {
   assignRole,
@@ -251,16 +260,44 @@ const editingUserCode = ref('')
 const userForm = reactive({
   userCode: '', name: '', deptCode: '', leaderCode: '', title: '', mobile: '', email: '', status: 'ACTIVE', roleCodes: [] as string[],
 })
+const userFormRef = ref<FormInstance>()
+const userRules: FormRules = {
+  userCode: requiredTextRules('人员编码', 64),
+  name: requiredTextRules('姓名', 64),
+  roleCodes: [{
+    validator: (_rule, roleCodes: string[], callback) => {
+      if (roleCodes.some((roleCode) => !roleCode.trim() || roleCode.length > 64)) {
+        callback(new Error('角色编码不能为空或仅含空格，且不能超过64个字符'))
+      } else {
+        callback()
+      }
+    },
+    trigger: 'change',
+  }],
+}
 
 // 部门编辑
 const deptVisible = ref(false)
 const editingDeptCode = ref('')
 const deptForm = reactive({ deptCode: '', name: '', parentCode: '', leaderId: '', sortNo: 0 })
+const deptFormRef = ref<FormInstance>()
+const deptRules: FormRules = {
+  deptCode: requiredTextRules('部门编码', 64),
+  name: requiredTextRules('部门名称', 128),
+}
 
 // 角色分配
 const assignVisible = ref(false)
-const assigningRole = ref<OrgRoleView | null>(null)
-const assignUserCodes = ref<string[]>([])
+const assignForm = reactive({ roleCode: '', userCodes: [] as string[] })
+const assignFormRef = ref<FormInstance>()
+const assignRules: FormRules = { roleCode: requiredTextRules('角色编码', 64) }
+
+function requiredTextRules(label: string, max: number): FormItemRule[] {
+  return [
+    { required: true, whitespace: true, message: `请填写${label}，不能仅含空格`, trigger: ['blur', 'change'] },
+    { max, message: `${label}不能超过${max}个字符`, trigger: ['blur', 'change'] },
+  ]
+}
 
 const nameByCode = new Map<string, string>()
 
@@ -366,13 +403,11 @@ function openUserDialog(row?: OrgUserView) {
   userForm.email = row?.email || ''
   userForm.status = row?.status || 'ACTIVE'
   userVisible.value = true
+  nextTick(() => userFormRef.value?.clearValidate())
 }
 
 async function onSaveUser() {
-  if (!userForm.userCode.trim() || !userForm.name.trim()) {
-    ElMessage.warning('请填写人员编码和姓名')
-    return
-  }
+  if (!await userFormRef.value?.validate().catch(() => false)) return
   saving.value = true
   try {
     await saveUser({
@@ -409,13 +444,11 @@ function openDeptDialog(row?: OrgDeptView) {
   deptForm.leaderId = row?.leaderId || ''
   deptForm.sortNo = row?.sortNo ?? 0
   deptVisible.value = true
+  nextTick(() => deptFormRef.value?.clearValidate())
 }
 
 async function onSaveDept() {
-  if (!deptForm.deptCode.trim() || !deptForm.name.trim()) {
-    ElMessage.warning('请填写部门编码和名称')
-    return
-  }
+  if (!await deptFormRef.value?.validate().catch(() => false)) return
   saving.value = true
   try {
     await saveDept({
@@ -441,20 +474,17 @@ async function onDeleteDept(row: OrgDeptView) {
 
 // ---------- 角色分配 ----------
 async function openAssignDialog(row: OrgRoleView) {
-  assigningRole.value = row
-  try {
-    assignUserCodes.value = await orgRoleUsers(row.roleCode)
-  } catch {
-    assignUserCodes.value = []
-  }
+  assignForm.roleCode = row.roleCode
+  assignForm.userCodes = await orgRoleUsers(row.roleCode)
   assignVisible.value = true
+  nextTick(() => assignFormRef.value?.clearValidate())
 }
 
 async function onAssign() {
-  if (!assigningRole.value) return
+  if (!await assignFormRef.value?.validate().catch(() => false)) return
   saving.value = true
   try {
-    const result = await assignRole(assigningRole.value.roleCode, assignUserCodes.value)
+    const result = await assignRole(assignForm.roleCode, assignForm.userCodes)
     assignVisible.value = false
     ElMessage.success(`已保存：新增 ${result.added} 人，移除 ${result.removed} 人`)
     await loadRoles()
