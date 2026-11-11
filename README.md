@@ -121,6 +121,9 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | GET | `/tasks/todo?userId=` | 待办 |
 | GET | `/tasks/done?userId=` | 已办 |
 | GET | `/tasks/count?userId=` | 三种状态数量 |
+| GET | `/workbench?userId=` | 工作台快照：角标 + 待办首页 + 未读抄送 + 增量游标（一次调用） |
+| GET | `/changes?userId=&cursor=` | 增量变更流：新待办/已办/抄送/实例状态变化，轮询即可，无需 Webhook |
+| GET | `/instances/by-business-key?businessKey=` | 按接入方业务单号反查实例状态 |
 | POST | `/tasks/{taskId}/approve` | 同意 |
 | POST | `/tasks/{taskId}/reject` | 驳回（TO_END 结束 / TO_START 退回发起人） |
 | POST | `/tasks/{taskId}/transfer` | 转交给其他在职人员 |
@@ -158,10 +161,6 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | POST | `/org/roles/{roleCode}/assign` | 角色人员全量分配（diff 增删映射，实时影响审批人解析） |
 | GET | `/instances` | 管理员视角：本租户全部实例分页（flowCode/status/keyword 过滤，keyword 匹配标题或发起人） |
 | GET | `/dashboard/stats` | 管理员数据看板：通过率、平均审批时长、近 14 天发起/办结趋势、流程 TOP5 |
-
-时间序列化：`LocalDateTime` 全局输出 `yyyy-MM-dd HH:mm:ss`（JacksonConfig，Jackson 3 + Boot 4.1）；反序列化兼容 `T` 与空格分隔。
-
-主管继承规则：「直属主管」类审批节点解析时，人员显式设置的 leaderCode 优先；未设置时自动继承所在部门的主管（本部门未设则沿上级部门逐级向上查找第一个配置了主管的部门），部门主管是本人时跳过本级继续向上，避免自审批。仅跨部门汇报线需要显式指定直属主管。
 | GET | `/tenant/info` | 当前租户信息 |
 | GET/POST | `/tenant/credentials` | 凭证列表（Secret 掩码）/ 新建（Secret 仅此一次完整返回） |
 | GET | `/platform/tenants?page=1&size=20&keyword=` | 平台管理员：租户分页列表，支持编码/名称/备注搜索（忽略大小写），每页最多 100 条，返回 list/total/page/size，含当前页租户统计 |
@@ -173,6 +172,12 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | POST | `/tenant/credentials/{id}/disable` | 停用凭证（立即拒绝 OpenAPI 调用） |
 | POST | `/tenant/credentials/{id}/enable` | 启用已停用的凭证（AppSecret 不变；已过期凭证需先轮换） |
 | GET | `/dashboard/summary` | 首页统计 |
+
+补充说明：
+
+- **时间序列化**：`LocalDateTime` 全局输出 `yyyy-MM-dd HH:mm:ss`（JacksonConfig，Jackson 3 + Boot 4.1）；反序列化兼容 `T` 与空格分隔。
+- **主管继承**：「直属主管」类审批节点解析时，人员显式设置的 leaderCode 优先；未设置时自动继承所在部门的主管（本部门未设则沿上级部门逐级向上查找第一个配置了主管的部门），部门主管是本人时跳过本级继续向上，避免自审批。仅跨部门汇报线需要显式指定直属主管。
+- **实时待办**：不接 Webhook 也能实时——`/workbench` 一次拿角标与待办首页，`/changes` 按游标增量拉新待办/已办/抄送/实例状态，详见 `docs/integration.md` 3.10。
 
 ## P1 已验证场景
 
@@ -245,6 +250,15 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 - 因此部门主管只需在部门上维护一次，部门内人员默认继承，跨部门汇报线才需要给个人单独指定；
 - 审批人解析在**发起时一次性冻结**写入流程变量，BPMN 只负责流转、不回查组织数据（运行期人员变动的影响见「注意事项」待办项）。
 
+### 9. 实时查询（轮询替代 Webhook）
+
+- 接入方无需暴露公网回调地址，也不用处理验签/重试：`/open/v1/workbench` 一次拿到角标 + 待办首页 + 未读抄送 + 游标；
+- `/open/v1/changes?userId=&cursor=` 增量下发四类事件：`TASK_CREATED`（新待办）、`TASK_COMPLETED`（已办）、`CC_CREATED`（抄送）、`INSTANCE_UPDATED`（我发起的实例状态变化）；
+- 事件全部由已有数据推导（Flowable 历史任务 + `bpm_cc` + `bpm_instance.updated_at`），**不新增事件表、不改写审批链路**；
+- 游标为毫秒时间戳，无积压时回退 3 秒形成重叠窗口规避事务可见性缺口，因此语义是「至少一次」：按 `eventId` 去重即可；
+- 有积压时返回 `hasMore=true` 且游标停在最后一条事件，保证推进不重放整页；
+- `/instances/by-business-key` 让接入方用自己的单号直接查状态，不必持久化 `instanceId`。
+
 ## 阶段计划
 
 | 阶段 | 内容 | 状态 |
@@ -261,6 +275,7 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | P8 | 平台管理员 + 租户全生命周期管理（租户 CRUD、停用/启用、进入租户、切换审计） | ✅ |
 | P9 | 管理员实例视图（全租户实例查询）+ 数据看板（通过率/平均时长/趋势/TOP5） | ✅ |
 | P10 | 组织维护入口（人员/部门/角色）、直属主管继承部门主管、全局时间序列化、统一分页与交互样式 | ✅ |
+| P11 | 实时查询：工作台快照、增量变更流（待办/已办/抄送/实例状态）、业务主键反查（免 Webhook 轮询接入） | ✅ |
 
 ## 测试
 

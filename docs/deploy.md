@@ -63,6 +63,9 @@ docker compose up -d --build
 - **请求**：POST JSON，Header 含 `X-EasyBpm-Event`（`instance.completed` / `instance.canceled`）、`X-EasyBpm-Signature`（HMAC-SHA256，密钥为租户 `webhook_secret`）、`X-EasyBpm-Delivery-Id`；
 - **可靠性**：outbox 模式——事务内落 `bpm_webhook_log` PENDING 行，后台每 30s 轮询投递；失败按 1m / 5m / 15m / 60m 指数退避重试，默认最多 5 次后标记 FAILED；2xx 视为成功；
 - **接入方校验**：用 `webhook_secret` 对原始 body 计算 HMAC-SHA256，与 `X-EasyBpm-Signature` 比对即可防伪造。
+- **可以不接**：Webhook 是可选的推送通道。接入方若不想暴露公网回调地址，直接关掉 `EASY_BPM_WEBHOOK_ENABLED`，
+  用 `/open/v1/workbench` + `/open/v1/changes` 轮询待办/已办/抄送与实例状态即可（见 `docs/integration.md` 3.10），
+  功能上不依赖 `bpm_tenant.webhook_url` 与 `webhook_secret`。
 
 ### 3.3 限流（P4）
 

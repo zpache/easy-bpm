@@ -5,6 +5,8 @@ import com.easybpm.common.JsonCodec;
 import com.easybpm.common.PageResult;
 import com.easybpm.engine.ActionResult;
 import com.easybpm.engine.CcView;
+import com.easybpm.engine.ChangeFeed;
+import com.easybpm.engine.ChangeFeedService;
 import com.easybpm.engine.FlowEngineService;
 import com.easybpm.engine.InstanceDetail;
 import com.easybpm.engine.InstanceView;
@@ -29,6 +31,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 /**
@@ -41,14 +45,17 @@ public class OpenApiController {
 
     private final FlowEngineService engine;
     private final WorkbenchQueryService query;
+    private final ChangeFeedService changeFeed;
     private final FlowDefinitionService definitions;
     private final OrgService orgService;
     private final JsonCodec json;
 
     public OpenApiController(FlowEngineService engine, WorkbenchQueryService query,
-                             FlowDefinitionService definitions, OrgService orgService, JsonCodec json) {
+                             ChangeFeedService changeFeed, FlowDefinitionService definitions,
+                             OrgService orgService, JsonCodec json) {
         this.engine = engine;
         this.query = query;
+        this.changeFeed = changeFeed;
         this.definitions = definitions;
         this.orgService = orgService;
         this.json = json;
@@ -127,6 +134,41 @@ public class OpenApiController {
     @Operation(summary = "查询待办/已办/已提交数量")
     public ApiResponse<WorkbenchCounts> counts(@RequestParam String userId) {
         return ApiResponse.ok(query.counts(userId));
+    }
+
+    @GetMapping("/workbench")
+    @Operation(summary = "工作台快照（一次调用）",
+            description = "返回角标数量、待办首页、未读抄送与变更游标；接入方首屏与红点无需多次请求")
+    public ApiResponse<WorkbenchSnapshot> workbench(
+            @RequestParam String userId,
+            @RequestParam(defaultValue = "20") int todoSize,
+            @RequestParam(defaultValue = "10") int ccSize) {
+        WorkbenchCounts counts = query.counts(userId);
+        // todoSize / ccSize 传 0 表示只要角标，不取列表
+        List<TaskView> todo = todoSize <= 0 ? List.of() : query.todo(userId, 1, size(todoSize), null, null).list();
+        List<CcView> ccUnread = ccSize <= 0 ? List.of() : query.cc(userId, 1, size(ccSize), true, null).list();
+        LocalDateTime now = LocalDateTime.now();
+        return ApiResponse.ok(new WorkbenchSnapshot(counts, todo, ccUnread,
+                now.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), now));
+    }
+
+    @GetMapping("/changes")
+    @Operation(summary = "增量变更流（轮询，免 Webhook）",
+            description = "按 userId 拉取游标之后的待办新增、已办完成、抄送与实例状态变化；"
+                    + "不传 cursor 时只返回初始游标，接入方先用 /workbench 对齐快照")
+    public ApiResponse<ChangeFeed> changes(
+            @RequestParam String userId,
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(required = false) Integer limit) {
+        return ApiResponse.ok(changeFeed.feed(userId, cursor, limit));
+    }
+
+    @GetMapping("/instances/by-business-key")
+    @Operation(summary = "按业务主键反查审批",
+            description = "接入方用自己的单号（businessKey）查状态，无需落地 instanceId；跨流程重复时取最近一条")
+    public ApiResponse<InstanceView> byBusinessKey(@RequestParam String businessKey,
+                                                   @RequestParam(required = false) String flowCode) {
+        return ApiResponse.ok(query.byBusinessKey(businessKey, flowCode));
     }
 
     @GetMapping("/cc")
@@ -224,6 +266,13 @@ public class OpenApiController {
 
     public record FlowSummary(String code, String name, String category, String description,
                               Integer version, Object formSchema) {
+    }
+
+    /**
+     * 工作台快照：角标 + 待办首页 + 未读抄送 + 增量游标，接入方首屏一次请求即可渲染。
+     */
+    public record WorkbenchSnapshot(WorkbenchCounts counts, List<TaskView> todo, List<CcView> ccUnread,
+                                    long cursor, LocalDateTime serverTime) {
     }
 
     public record OrgSyncResult(int users, int depts, int roles) {
