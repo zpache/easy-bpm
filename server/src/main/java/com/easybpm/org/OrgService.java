@@ -3,6 +3,7 @@ package com.easybpm.org;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.easybpm.common.BizException;
 import com.easybpm.common.Ids;
+import com.easybpm.common.crypto.DataCipher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,11 +24,19 @@ public class OrgService {
     private final OrgUserMapper userMapper;
     private final OrgDeptMapper deptMapper;
     private final OrgUserRoleMapper roleMapper;
+    private final DataCipher cipher;
 
-    public OrgService(OrgUserMapper userMapper, OrgDeptMapper deptMapper, OrgUserRoleMapper roleMapper) {
+    public OrgService(OrgUserMapper userMapper, OrgDeptMapper deptMapper, OrgUserRoleMapper roleMapper,
+                      DataCipher cipher) {
         this.userMapper = userMapper;
         this.deptMapper = deptMapper;
         this.roleMapper = roleMapper;
+        this.cipher = cipher;
+    }
+
+    /** 手机号盲索引：用于「按手机号精确查找」，明文与密文都不参与条件匹配。 */
+    public String mobileIndex(String mobile) {
+        return cipher.blindIndex(mobile);
     }
 
     public OrgUser findUser(String userCode) {
@@ -152,6 +161,8 @@ public class OrgService {
         }
         OrgUser existing = findUser(input.getUserCode());
         LocalDateTime now = LocalDateTime.now();
+        // 手机号只存盲索引，供精确查找；密文本身不参与查询条件
+        input.setMobileHash(mobileIndex(input.getMobile()));
         if (existing == null) {
             input.setId(Ids.id());
             input.setStatus(input.getStatus() == null || input.getStatus().isBlank()
@@ -168,6 +179,7 @@ public class OrgService {
         existing.setTitle(input.getTitle());
         existing.setMobile(input.getMobile());
         existing.setEmail(input.getEmail());
+        existing.setMobileHash(input.getMobileHash());
         existing.setStatus(input.getStatus() == null || input.getStatus().isBlank()
                 ? existing.getStatus() : input.getStatus());
         existing.setUpdatedAt(now);

@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS bpm_tenant_credential (
     tenant_id    VARCHAR(32)  NOT NULL COMMENT '租户ID',
     name         VARCHAR(128) NOT NULL COMMENT '凭证名称',
     app_key      VARCHAR(64)  NOT NULL COMMENT 'AppKey',
-    app_secret   VARCHAR(128) NOT NULL COMMENT 'AppSecret',
+    app_secret   VARCHAR(255) NOT NULL COMMENT 'AppSecret（AES-256-GCM 密文）',
     status       VARCHAR(16)  NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE/DISABLED',
     expire_at    DATETIME(3)  NULL COMMENT '过期时间，空表示不过期',
     last_used_at DATETIME(3)  NULL,
@@ -70,13 +70,15 @@ CREATE TABLE IF NOT EXISTS bpm_org_user (
     dept_name   VARCHAR(128) NULL,
     leader_code VARCHAR(64)  NULL COMMENT '直属主管人员编码',
     title       VARCHAR(64)  NULL,
-    mobile      VARCHAR(32)  NULL,
-    email       VARCHAR(128) NULL,
+    mobile      VARCHAR(191) NULL COMMENT 'AES-256-GCM 密文（enc:v1:...）',
+    email       VARCHAR(255) NULL COMMENT 'AES-256-GCM 密文（enc:v1:...）',
+    mobile_hash VARCHAR(64)  NULL COMMENT '手机号盲索引 HMAC-SHA256，仅用于精确查找',
     status      VARCHAR(16)  NOT NULL DEFAULT 'ACTIVE',
     created_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
     UNIQUE KEY uk_org_user (tenant_id, user_code),
+    KEY idx_org_user_mobile_hash (tenant_id, mobile_hash),
     KEY idx_org_user_dept (tenant_id, dept_code)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '组织人员';
 

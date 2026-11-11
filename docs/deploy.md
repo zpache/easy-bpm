@@ -52,6 +52,8 @@ docker compose up -d --build
 |---|---|---|
 | `EASY_BPM_DB_PASSWORD` | 数据库 root 密码（必填） | - |
 | `EASY_BPM_JWT_SECRET` | 控制台 JWT 签名密钥，32 位以上随机串（必填） | - |
+| `EASY_BPM_DATA_KEY` | 敏感字段落库加密密钥（手机号/邮箱/AppSecret），生产必填 | 内置开发密钥（启动告警） |
+| `EASY_BPM_DATA_KEY_PREVIOUS` | 密钥轮换时的旧密钥，仅用于解密 | 空 |
 | `EASY_BPM_WEBHOOK_ENABLED` | Webhook 回调开关 | `true` |
 | `EASY_BPM_RATE_LIMIT` | OpenAPI 限流（次/分钟，按 AppKey，0 关闭） | `600` |
 
@@ -77,6 +79,25 @@ docker compose up -d --build
 
 控制台敏感操作（流程保存/发布/停用/删除/回滚、凭证新建/轮换/停用）自动记录到 `bpm_audit_log`，含操作人、目标、详情与 traceId；控制台「审计日志」页可按操作类型/关键字检索（仅管理员）。
 
+### 3.5 敏感数据加密（P12）
+
+落库加密的字段：`bpm_org_user.mobile`、`bpm_org_user.email`、`bpm_tenant_credential.app_secret`。
+
+- **算法**：AES-256-GCM，每条独立 12 字节随机 IV，密文格式 `enc:v1:` + Base64(IV + 密文 + TAG)，具备完整性校验（篡改会解密失败而不是返回错值）；
+- **密钥**：`EASY_BPM_DATA_KEY`，任意长度字符串经 SHA-256 派生 32 字节密钥；未配置时用内置开发密钥并打印 WARN；
+- **透明加解密**：MyBatis `TypeHandler` 在写库前加密、读库后解密，业务代码与接口返回仍是明文，接入方无感知；
+- **手机号精确查找**：密文无法 LIKE，额外维护 `mobile_hash`（带密钥 HMAC-SHA256 盲索引），控制台按手机号搜索走盲索引精确匹配；姓名/工号仍是模糊匹配；
+- **存量迁移**：启动时 `SensitiveDataMigration` 全表比对，把历史明文/旧密钥密文重写为新密钥并补齐盲索引，只更新需要的行（不刷新 `updated_at`），可重复执行；
+- **结构升级**：存量库先执行 `db/migrations/2026-11-11_p12_sensitive_data.sql`（加宽列、新增 `mobile_hash` 与索引），再启动新版本。
+
+密钥轮换步骤：
+
+1. 生成新密钥，配置 `EASY_BPM_DATA_KEY=<新密钥>`、`EASY_BPM_DATA_KEY_PREVIOUS=<旧密钥>`；
+2. 重启服务，日志出现「敏感字段迁移完成」即表示旧密文已用新密钥重写；
+3. 观察一段时间无「解密失败」日志后，移除 `EASY_BPM_DATA_KEY_PREVIOUS`。
+
+> 密钥一旦丢失，已加密的手机号/邮箱/AppSecret 不可恢复（需重新同步组织、轮换凭证）。请与数据库备份分开保管。
+
 ## 4. 运维手册
 
 ### 4.1 建库与初始化
@@ -100,6 +121,8 @@ docker exec -i easy-bpm-mysql mysql -uroot -p$EASY_BPM_DB_PASSWORD easy_bpm < db
 ### 4.4 生产检查清单
 
 - [ ] `EASY_BPM_JWT_SECRET` 已替换为强随机值，且未入库 git
+- [ ] `EASY_BPM_DATA_KEY` 已配置为独立随机值，并与数据库备份分开保管
+- [ ] 已执行 `db/migrations/2026-11-11_p12_sensitive_data.sql`，启动日志无「解密失败」
 - [ ] 数据库密码强随机，`.env` 权限 600
 - [ ] 演示数据确认关闭（prod profile 默认 `easybpm.demo.enabled=false`）
 - [ ] Swagger 仅内网可达（或在 nginx 层封禁 `/swagger-ui`、`/v3/api-docs`）

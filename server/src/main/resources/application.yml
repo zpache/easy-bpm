@@ -40,6 +40,11 @@ easybpm:
   security:
     jwt-secret: ${EASY_BPM_JWT_SECRET:easy-bpm-dev-secret-change-me-2026-11-09}
     token-ttl-hours: ${EASY_BPM_TOKEN_TTL_HOURS:12}
+    # 敏感字段（手机号/邮箱/AppSecret）落库加密密钥，任意长度字符串经 SHA-256 派生
+    # 未配置时使用内置开发密钥（启动告警）；生产必须配置 EASY_BPM_DATA_KEY
+    data-key: ${EASY_BPM_DATA_KEY:}
+    # 密钥轮换用的旧密钥：仅解密，启动迁移会把旧密文重写为新密钥
+    data-key-previous: ${EASY_BPM_DATA_KEY_PREVIOUS:}
   demo:
     enabled: ${EASY_BPM_DEMO_ENABLED:true}
   webhook:

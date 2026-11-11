@@ -28,7 +28,8 @@ import java.util.HexFormat;
  * OpenAPI 鉴权。
  *
  * <p>推荐签名模式：X-App-Key + X-Timestamp + X-Signature，
- * 签名串 = METHOD + "\n" + requestURI + "\n" + timestamp + "\n" + body，HMAC-SHA256 十六进制。
+ * 签名串 = METHOD + "\n" + 请求路径（含查询串） + "\n" + timestamp + "\n" + body，HMAC-SHA256 十六进制。
+ * 为兼容早期接入方，同时接受「路径不含查询串」的签名写法（查询参数不参与验签）。
  * 为方便快速联调，也支持 X-App-Secret 明文模式（仅建议内网/调试）。
  */
 @Component
@@ -100,10 +101,19 @@ public class OpenApiAuthFilter extends OncePerRequestFilter {
             String payload = request.getMethod() + "\n" + request.getRequestURI() + "\n" + timestamp + "\n"
                     + new String(request.body(), StandardCharsets.UTF_8);
             String expected = hmacHex(credential.getAppSecret(), payload);
-            if (!constantTimeEquals(expected, signature)) {
-                throw new BizException(ErrorCode.SIGNATURE_INVALID, "签名不匹配");
+            if (constantTimeEquals(expected, signature)) {
+                return;
             }
-            return;
+            // 兼容签名包含查询串的写法（SDK 默认行为，避免 GET 参数被篡改而不被发现）
+            String query = request.getQueryString();
+            if (query != null && !query.isEmpty()) {
+                String withQuery = request.getMethod() + "\n" + request.getRequestURI() + "?" + query + "\n"
+                        + timestamp + "\n" + new String(request.body(), StandardCharsets.UTF_8);
+                if (constantTimeEquals(hmacHex(credential.getAppSecret(), withQuery), signature)) {
+                    return;
+                }
+            }
+            throw new BizException(ErrorCode.SIGNATURE_INVALID, "签名不匹配");
         }
 
         String secret = request.getHeader("X-App-Secret");
