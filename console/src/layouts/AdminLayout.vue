@@ -2,14 +2,7 @@
   <el-container class="layout">
     <el-aside :width="collapsed ? '64px' : '210px'" class="aside">
       <div class="brand" @click="router.push('/dashboard')">
-        <div class="brand-logo">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
-            <path d="M4 6a2 2 0 1 1 4 0 2 2 0 0 1-4 0Z" fill="#fff" />
-            <path d="M4 18a2 2 0 1 1 4 0 2 2 0 0 1-4 0Z" fill="#fff" />
-            <path d="M16 12a2 2 0 1 1 4 0 2 2 0 0 1-4 0Z" fill="#fff" />
-            <path d="M7 6h5a3 3 0 0 1 3 3v1a2 2 0 0 0 2 2M7 18h5a3 3 0 0 0 3-3v-1a2 2 0 0 1 2-2" stroke="#fff" stroke-width="1.6" stroke-linecap="round" />
-          </svg>
-        </div>
+        <img class="brand-logo" :src="easyBpmLogo" alt="easy-bpm" width="32" height="32" />
         <span v-show="!collapsed" class="brand-name">easy-bpm</span>
       </div>
       <el-menu
@@ -146,6 +139,7 @@ import {
   User,
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import easyBpmLogo from '@/assets/easy-bpm.svg?no-inline'
 
 const route = useRoute()
 const router = useRouter()
@@ -200,13 +194,10 @@ function onBackToPlatform() {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 .brand-logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #0960bd 0%, #3aa0ff 100%);
   flex-shrink: 0;
 }
 .brand-name {
