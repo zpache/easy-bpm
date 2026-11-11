@@ -117,6 +117,17 @@ public class WorkbenchQueryService {
 
         Map<String, BpmInstance> instances = instanceMap(tasks.stream()
                 .map(HistoricTaskInstance::getProcessInstanceId).toList());
+        // 实例投影已被删除的历史任务（如测试数据清理后的残留）不展示，避免出现空标题幽灵行
+        List<HistoricTaskInstance> visible = tasks.stream()
+                .filter(task -> instances.containsKey(task.getProcessInstanceId()))
+                .toList();
+        if (visible.size() < tasks.size()) {
+            total = Math.max(total - countOrphanInstances(query), visible.size());
+            tasks = visible;
+            if (tasks.isEmpty()) {
+                return PageResult.of(List.of(), total, page, size);
+            }
+        }
         Map<String, String> names = namesOf(tasks.stream().map(HistoricTaskInstance::getAssignee).toList());
         Map<String, String> actions = actionsOf(tasks.stream().map(HistoricTaskInstance::getId).toList());
 
@@ -348,6 +359,22 @@ public class WorkbenchQueryService {
                 .filter(id -> id != null && !id.isBlank())
                 .distinct()
                 .toList();
+    }
+
+    /**
+     * 统计给定查询下「实例投影已不存在」的历史任务所涉实例数（去重）。
+     * 仅在该页命中幽灵任务时调用，用于修正分页总数。
+     */
+    private long countOrphanInstances(HistoricTaskInstanceQuery query) {
+        List<String> ids = query.list().stream()
+                .map(HistoricTaskInstance::getProcessInstanceId)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            return 0;
+        }
+        Map<String, BpmInstance> map = instanceMap(ids);
+        return ids.stream().filter(id -> !map.containsKey(id)).count();
     }
 
     private int offset(int page, int size) {
