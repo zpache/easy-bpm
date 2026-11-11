@@ -144,6 +144,9 @@ POST /open/v1/instances
 
 ### 3.3 待办 / 已办 / 已提交
 
+> 需要「实时」感知变化（角标、新待办提醒）时，用 3.10 的 `/workbench` + `/changes` 轮询，
+> 不需要接 Webhook。本节接口用于列表页与详情页的直接查询。
+
 ```
 GET /open/v1/tasks/todo?userId=u1002&page=1&size=20&flowCode=leave&keyword=请假
 GET /open/v1/tasks/done?userId=u1002&page=1&size=20
@@ -289,6 +292,136 @@ GET /open/v1/instances/{instanceId}
 
 返回 `instance`（含 `formData`、状态、当前节点）、`timeline`（提交/同意/驳回/抄送记录）、`pendingTasks`（当前待办及处理人）。
 
+### 3.10 轮询接入：不接 Webhook 也能实时拿待办
+
+绝大多数 ERP / SaaS 不需要「中台反向调你」：只要暴露中台的查询接口，前端定时拉取即可。
+本方案零回调配置——不用公网地址、不用处理验签与重试，接入方只维护一个游标。
+
+```
+GET /open/v1/workbench?userId=u1002&todoSize=20&ccSize=10   # 首屏快照（角标+待办+未读抄送+游标）
+GET /open/v1/changes?userId=u1002&cursor=1762829400000&limit=50  # 增量变更流
+GET /open/v1/instances/by-business-key?businessKey=LEAVE-2026-0001 # 用自己的单号查状态
+```
+
+#### 3.10.1 工作台快照（一次请求渲染首屏）
+
+```json
+{
+  "code": 0,
+  "data": {
+    "counts": { "todo": 2, "done": 3, "submitted": 5, "ccUnread": 1 },
+    "todo": [
+      {
+        "taskId": "5f0c9a...",
+        "instanceId": "363c8e05-dc18-11f1-9b0b-860ba02831a5",
+        "nodeName": "直属主管审批",
+        "instanceTitle": "张三请假 3 天",
+        "flowCode": "leave",
+        "flowName": "请假审批",
+        "initiatorName": "张三",
+        "status": "PENDING",
+        "createdAt": "2026-11-11 09:30:00"
+      }
+    ],
+    "ccUnread": [
+      { "id": "cc_9f3c...", "instanceId": "363c8e05-...", "instanceTitle": "差旅报销 - 张三", "read": false, "createdAt": "2026-11-11 09:31:00" }
+    ],
+    "cursor": 1762829400000,
+    "serverTime": "2026-11-11 09:43:31"
+  }
+}
+```
+
+- `counts` 可直接做角标，无需再调 `/tasks/count`；
+- `todoSize=0` 时只取角标，适合后台常驻的轮询；
+- `cursor` 是**首次接增量流**的起点，直接透传给 `/changes`，避免回放历史事件。
+
+#### 3.10.2 增量变更流（推荐主用）
+
+首次不传 `cursor`：只返回初始游标与空事件列表（不回放历史），随后带上游标轮询：
+
+```json
+{
+  "code": 0,
+  "data": {
+    "cursor": 1762829420000,
+    "hasMore": false,
+    "events": [
+      {
+        "eventId": "TASK_CREATED:5f0c9a3e-...",
+        "type": "TASK_CREATED",
+        "at": "2026-11-11 09:40:12",
+        "taskId": "5f0c9a3e-...",
+        "instanceId": "363c8e05-...",
+        "instanceTitle": "张三请假 3 天",
+        "flowCode": "leave",
+        "flowName": "请假审批",
+        "nodeName": "直属主管审批",
+        "action": null,
+        "actorId": "u1002",
+        "actorName": "李四",
+        "instanceStatus": "RUNNING",
+        "currentNodeName": "直属主管审批"
+      }
+    ],
+    "serverTime": "2026-11-11 09:43:34"
+  }
+}
+```
+
+事件类型：
+
+| `type` | 触发时机 | 接入方建议动作 |
+|---|---|---|
+| `TASK_CREATED` | 新任务派给该用户（含会签的其他成员、转交后的新处理人） | 角标 +1、刷新待办、发站内信 |
+| `TASK_COMPLETED` | 该用户处理完任务（含或签被他人抢先而自动取消的） | 从待办移除、刷新已办 |
+| `CC_CREATED` | 抄送节点写入该用户 | 未读抄送 +1、弹提醒 |
+| `INSTANCE_UPDATED` | 该用户**发起**的实例状态/当前节点变化 | 更新「我发起的」状态，终态可完结本地单据 |
+
+游标与去重（重要）：
+
+- `cursor` 是毫秒时间戳，当作**不透明值**原样回传即可；
+- 无积压时服务端会回退约 3 秒形成重叠窗口，防止「事件已写、事务未提交」被漏掉，
+  因此**同一 `eventId` 可能重复下发**：客户端按 `eventId` 做本地去重（保留 1 天即可）；
+- `hasMore=true` 表示积压超过 `limit`，用返回的 `cursor` **立即再拉一次**，不要等下一个周期；
+- `limit` 默认 50、上限 200；事件按 `at` 升序。
+
+推荐的轮询节奏：
+
+| 场景 | 接口 | 频率 |
+|---|---|---|
+| 应用内角标 / 消息中心 | `/workbench`（`todoSize=0`）或 `/changes` | 15–30 秒 |
+| 待办 / 已办列表页 | `/tasks/todo`、`/tasks/done` | 打开页面时 + 下拉刷新 |
+| 提交后等待结果 | `/changes` 的 `INSTANCE_UPDATED`，或 `/instances/by-business-key` | 30 秒，直到终态 |
+| 页面不可见 / 移动端后台 | — | 暂停轮询，回到前台立即拉一次 |
+
+连续多次空结果可退避到 60 秒；收到 `429`（`42900`）按响应头 `Retry-After` 等待，
+不要固定高频重试。单 AppKey 默认 600 次/分钟，按「用户数 × 轮询频率」估算即可。
+
+#### 3.10.3 按业务主键反查
+
+```json
+{
+  "code": 0,
+  "data": {
+    "instanceId": "363c8e05-...",
+    "businessKey": "LEAVE-2026-0001",
+    "status": "APPROVED",
+    "currentNodeName": "审批通过",
+    "endedAt": "2026-11-11 10:02:11"
+  }
+}
+```
+
+- 接入方不必落地 `instanceId`，用自己的单号即可；跨流程重复时取最近发起的一条，可用 `flowCode` 精确限定；
+- 未命中返回 `42001`。
+
+#### 3.10.4 和 Webhook 的关系
+
+- 轮询与 Webhook **互不依赖**，只接轮询就是完整方案；
+- 若已有 Webhook，可继续用它在实例结束时做异步落库，轮询作为兜底；
+- 两者都接时按 `instanceId + status`（Webhook）与 `eventId`（轮询）分别去重，不会重复处理。
+
 ## 4. 审批链配置（控制台）
 
 流程定义由控制台维护，保存结构如下：
@@ -366,4 +499,5 @@ GET /open/v1/instances/{instanceId}
 
 - 发起：始终带 `idempotencyKey`（建议用业务单号）。网络超时后原样重试，不会产生重复实例。
 - 同意/驳回：任务已处理会返回 `43003`，按成功处理或刷新任务列表，不要盲目重试其他任务。
+- 轮询：`cursor` 原样回传，事件按 `eventId` 去重；`hasMore=true` 立即续拉，`429` 按 `Retry-After` 退避。
 - 4xx 不要重试（除 429/408）；5xx 可退避重试 2 次并记录 `traceId`。

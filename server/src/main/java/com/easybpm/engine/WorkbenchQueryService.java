@@ -296,6 +296,23 @@ public class WorkbenchQueryService {
         return detail(instanceId).instance();
     }
 
+    /**
+     * 按接入方业务主键反查实例。业务主键在同一流程内通常唯一，跨流程可能重复，
+     * 因此按 startedAt 倒序取最近一条，可用 flowCode 精确限定。
+     */
+    public InstanceView byBusinessKey(String businessKey, String flowCode) {
+        BpmInstance row = instanceMapper.selectOne(new LambdaQueryWrapper<BpmInstance>()
+                .eq(BpmInstance::getBusinessKey, businessKey)
+                .eq(flowCode != null && !flowCode.isBlank(), BpmInstance::getFlowCode, flowCode)
+                .orderByDesc(BpmInstance::getStartedAt)
+                .last("limit 1"));
+        if (row == null) {
+            throw new BizException(ErrorCode.INSTANCE_NOT_FOUND,
+                    "未找到业务主键对应的审批：" + businessKey);
+        }
+        return toInstanceView(row);
+    }
+
     public List<InstanceView> recent(int limit) {
         List<BpmInstance> rows = instanceMapper.selectList(new LambdaQueryWrapper<BpmInstance>()
                 .orderByDesc(BpmInstance::getStartedAt).last("limit " + Math.max(1, limit)));
