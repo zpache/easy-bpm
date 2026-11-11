@@ -12,6 +12,8 @@
 
 演示环境：`ak_demo` / `sk_demo_2026`，租户 `demo`。
 
+Java 接入方可直接用官方 SDK（签名、分页、轮询已封装）：见 [`docs/sdk-java.md`](sdk-java.md)。
+
 ## 2. 鉴权
 
 所有 `/open/v1/**` 请求必须携带：
@@ -26,10 +28,13 @@
 签名串（字段之间用 `\n`）：
 
 ```
-METHOD + "\n" + requestURI + "\n" + timestamp + "\n" + rawBody
+METHOD + "\n" + requestTarget + "\n" + timestamp + "\n" + rawBody
 ```
 
-`requestURI` 含路径前缀，例如 `/open/v1/instances`；时间戳与服务器相差不得超过 5 分钟。
+- `requestTarget` = 路径前缀 + 路径 + **查询串**，例如 `/open/v1/tasks/todo?userId=u1002&page=1`；
+  查询串参与签名可防止 GET 参数被篡改；
+- 服务端同时兼容「不含查询串」的旧写法（`/open/v1/tasks/todo`），老接入方无需改造；
+- `timestamp` 为毫秒时间戳，与服务器相差不得超过 5 分钟；`rawBody` 为原始请求体，GET 时为空串。
 
 ### Java 示例
 
@@ -282,7 +287,9 @@ POST /open/v1/org/sync
 ```
 
 - 全部按编码幂等 upsert；`users[].status` 支持 `ACTIVE / DISABLED`（离职置 DISABLED 即不可再被解析为审批人）；
-- `roles` 为全量替换该人员的角色列表；不传对应段落则跳过。
+- `roles` 为全量替换该人员的角色列表；不传对应段落则跳过；
+- `mobile` / `email` 落库前由中台加密（AES-256-GCM），接口返回仍是明文，接入方无需处理；
+  手机号另存带密钥盲索引以支持精确查找，因此「按手机号模糊搜索」不可用，模糊查询请用姓名/工号。
 
 ### 3.9 详情与时间线
 

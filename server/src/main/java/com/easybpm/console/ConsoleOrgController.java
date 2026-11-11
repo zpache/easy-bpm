@@ -75,13 +75,18 @@ public class ConsoleOrgController {
                                                    @RequestParam(required = false) String keyword,
                                                    @RequestParam(required = false) String deptCode,
                                                    @RequestParam(required = false) String status) {
+        boolean hasKeyword = keyword != null && !keyword.isBlank();
+        String mobileIndex = hasKeyword && keyword.trim().matches("\\d{6,}") ? orgService.mobileIndex(keyword) : null;
         LambdaQueryWrapper<OrgUser> wrapper = new LambdaQueryWrapper<OrgUser>()
                 .eq(deptCode != null && !deptCode.isBlank(), OrgUser::getDeptCode, deptCode)
                 .eq(status != null && !status.isBlank(), OrgUser::getStatus, status)
-                .and(keyword != null && !keyword.isBlank(),
-                        w -> w.like(OrgUser::getName, keyword)
-                                .or().like(OrgUser::getUserCode, keyword)
-                                .or().like(OrgUser::getMobile, keyword))
+                .and(hasKeyword, w -> {
+                    w.like(OrgUser::getName, keyword).or().like(OrgUser::getUserCode, keyword);
+                    // 手机号密文无法模糊匹配，改用盲索引做精确查找
+                    if (mobileIndex != null) {
+                        w.or().eq(OrgUser::getMobileHash, mobileIndex);
+                    }
+                })
                 .orderByDesc(OrgUser::getUpdatedAt);
         Page<OrgUser> result = userMapper.selectPage(new Page<>(Math.max(page, 1),
                 Math.min(Math.max(size, 1), 100)), wrapper);

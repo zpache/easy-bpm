@@ -26,3 +26,6 @@ logs/
 **/application-local.yml
 **/application-local.yaml
 !**/application-local.yml.example
+
+# SDK build
+sdk-java/target/

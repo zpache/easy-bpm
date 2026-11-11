@@ -48,9 +48,11 @@ easy-bpm/
 │  └─ src/main/resources/db/schema-mysql.sql
 ├─ db/mysql/                     # 生产建表脚本
 ├─ console/                      # 控制台前端（Vue3 + TS + Vite + Element Plus + Pinia）
+├─ sdk-java/                     # Java SDK（签名、审批闭环、增量轮询，Java 17+）
 └─ docs/                         # 文档
    ├─ architecture.md            # 架构说明（分层、多租户、编译链路、数据表）
    ├─ integration.md             # 接入指南（签名、接口、错误码）
+   ├─ sdk-java.md                # Java SDK 使用手册
    ├─ deploy.md                  # 部署与运维（Docker、环境变量、回调配置）
    ├─ console.md                 # 控制台使用手册（含页面截图）
    └─ images/                    # 控制台截图
@@ -259,6 +261,20 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 - 有积压时返回 `hasMore=true` 且游标停在最后一条事件，保证推进不重放整页；
 - `/instances/by-business-key` 让接入方用自己的单号直接查状态，不必持久化 `instanceId`。
 
+### 10. 敏感数据加密
+
+- 手机号、邮箱、AppSecret 落库前用 AES-256-GCM 加密（`enc:v1:` + Base64(IV+密文+TAG)），读取时透明解密，接口与业务代码仍按明文使用；
+- 密钥为 `EASY_BPM_DATA_KEY`，支持 `EASY_BPM_DATA_KEY_PREVIOUS` 双密钥轮换；未配置时用内置开发密钥并启动告警；
+- 密文无法模糊匹配：手机号额外维护带密钥盲索引 `mobile_hash`，控制台仍支持按手机号精确查找；
+- 存量数据由启动迁移自动重写（幂等，未变更行不产生 UPDATE），结构升级脚本见 `db/migrations/2026-11-11_p12_sensitive_data.sql`。
+
+### 11. Java SDK
+
+- `sdk-java/` 是独立 Maven 模块（`com.easybpm:easy-bpm-sdk`，Java 17+），只依赖 Jackson，HTTP 走 JDK `HttpClient`；
+- 封装签名鉴权（查询串参与签名）、全部 OpenAPI、GET 自动重试与 429 退避、`EasyBpmException`（含 code/traceId）；
+- `ChangePoller` 一条链把游标推进、`hasMore` 续拉、`eventId` 去重、失败退避都做完，等于「没有 Webhook 的实时待办」；
+- 用法见 `docs/sdk-java.md`，方法对照表覆盖 `docs/integration.md` 的全部接口。
+
 ## 阶段计划
 
 | 阶段 | 内容 | 状态 |
@@ -276,6 +292,8 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | P9 | 管理员实例视图（全租户实例查询）+ 数据看板（通过率/平均时长/趋势/TOP5） | ✅ |
 | P10 | 组织维护入口（人员/部门/角色）、直属主管继承部门主管、全局时间序列化、统一分页与交互样式 | ✅ |
 | P11 | 实时查询：工作台快照、增量变更流（待办/已办/抄送/实例状态）、业务主键反查（免 Webhook 轮询接入） | ✅ |
+| P12 | 敏感数据加密（手机号/邮箱/AppSecret，AES-256-GCM + 盲索引 + 存量迁移） | ✅ |
+| P13 | Java SDK（`sdk-java/`）：签名鉴权、审批闭环、工作台快照、增量轮询器、组织同步 | ✅ |
 
 ## 测试
 
@@ -293,5 +311,7 @@ cd server && mvn test
 - **H2 不能使用 `MODE=MySQL`**：Flowable 会据此选择 MySQL 方言，`IDENTITY` 建表语句在 H2 下报错。开发用 MySQL，测试用 H2 原生模式。
 - Flowable 引擎表（`ACT_*`）与业务表同库，生产环境建议 `flowable.database-schema-update=false`，用官方脚本初始化。
 - 生产必须替换 `EASY_BPM_JWT_SECRET`，并通过环境变量提供数据库账号密码。
+- 生产必须配置 `EASY_BPM_DATA_KEY`（敏感字段加密密钥），并与数据库备份分开保管：密钥丢失后手机号/邮箱/AppSecret 不可恢复，只能重新同步组织、轮换凭证。
+- 存量库升级到 P12 需先执行 `db/migrations/2026-11-11_p12_sensitive_data.sql`（加宽 `mobile`/`email`/`app_secret`，新增 `mobile_hash`），再启动新版本，启动日志出现「敏感字段迁移完成」即升级完毕。
 - 当前驳回策略支持 `TO_END`（直接结束）与 `TO_START`（退回发起人，重提后重新流转）。
 - **【待办】审批人运行期兜底**：审批人列表在发起时解析冻结，实例运行中人员离职/停用后，其名下待办会卡死。规划方案：① `/org/sync` 检测 ACTIVE→停用事件，对名下运行中待办按节点最新组织数据重解析并自动转办（时间线留痕），同时刷新集合变量覆盖顺序节点后续任务；② 重解析为空时按节点兜底策略自动通过/驳回，默认拦截策略记告警；③ 审批接口校验操作人在职状态，离职者无法处理存量待办。转办目标建议优先同节点在职审批人，其次部门主管，避免会签计数失衡。
