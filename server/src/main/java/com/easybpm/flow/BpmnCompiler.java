@@ -20,7 +20,10 @@ import java.util.regex.Pattern;
  *       从而由引擎原生支持或签/会签；</li>
  *   <li>节点后接排他网关，decision_&lt;nodeId&gt;=REJECT 时走 endRejected，否则进入下一节点；</li>
  *   <li>带条件的节点前接排他网关，cond_&lt;nodeId&gt; 由发起时求值，false 直接跳过；</li>
- *   <li>抄送节点编译为 serviceTask，由 ccDelegate 落抄送记录。</li>
+ *   <li>抄送节点编译为 serviceTask，由 ccDelegate 落抄送记录；</li>
+ *   <li>条件网关（CONDITION）编译为排他网关 + 各分支子链 + 汇聚网关：
+ *       分支条件内联为 sequenceFlow 的 conditionExpression（运行时到达网关时用当前变量求值，
+ *       FIRST-MATCH 按 branches 声明顺序），条件为空的分支即默认分支（无条件流，必然可走）。</li>
  * </ul>
  */
 @Component
@@ -34,7 +37,7 @@ public class BpmnCompiler {
         List<FlowNode> nodes = schema.nodes();
         List<FlowNode> middle = nodes.subList(1, nodes.size() - 1);
 
-        StringBuilder xml = new StringBuilder(4096);
+        StringBuilder xml = new StringBuilder(8192);
         xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         xml.append("<definitions xmlns=\"http://www.omg.org/spec/BPMN/20100524/MODEL\"")
                 .append(" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"")
@@ -47,11 +50,31 @@ public class BpmnCompiler {
         xml.append("    <sequenceFlow id=\"sf_start\" sourceRef=\"start\" targetRef=\"")
                 .append(entryOf(middle.getFirst())).append("\"/>\n");
 
-        for (int i = 0; i < middle.size(); i++) {
-            FlowNode node = middle.get(i);
-            String nextEntry = i + 1 < middle.size() ? entryOf(middle.get(i + 1)) : "end";
+        emitChain(xml, middle, "end");
 
-            if (hasCondition(node)) {
+        xml.append("    <endEvent id=\"end\" name=\"审批通过\"/>\n");
+        xml.append("    <endEvent id=\"endRejected\" name=\"审批驳回\"/>\n");
+        xml.append("  </process>\n");
+        xml.append("</definitions>\n");
+        return xml.toString();
+    }
+
+    /**
+     * 输出一条节点链并把链尾连接到 exitRef。网关节点会展开为
+     * 分支网关 + 各分支子链（递归）+ 汇聚网关，汇聚网关再连接 exitRef。
+     */
+    private void emitChain(StringBuilder xml, List<FlowNode> nodes, String exitRef) {
+        for (int i = 0; i < nodes.size(); i++) {
+            FlowNode node = nodes.get(i);
+            boolean last = i == nodes.size() - 1;
+            String nextEntry = last ? exitRef : entryOf(nodes.get(i + 1));
+
+            if (node.isGateway()) {
+                emitGateway(xml, node, nextEntry);
+                continue;
+            }
+
+            if (node.hasCondition()) {
                 xml.append("    <exclusiveGateway id=\"gw_in_").append(node.id())
                         .append("\" default=\"sf_skip_").append(node.id()).append("\"/>\n");
                 xml.append("    <sequenceFlow id=\"sf_take_").append(node.id())
@@ -88,12 +111,43 @@ public class BpmnCompiler {
                         .append(nextEntry).append("\"/>\n");
             }
         }
+    }
 
-        xml.append("    <endEvent id=\"end\" name=\"审批通过\"/>\n");
-        xml.append("    <endEvent id=\"endRejected\" name=\"审批驳回\"/>\n");
-        xml.append("  </process>\n");
-        xml.append("</definitions>\n");
-        return xml.toString();
+    /** 条件网关：split 网关按分支声明顺序 FIRST-MATCH，各分支子链汇聚到 converge 网关后连向 exitRef。 */
+    private void emitGateway(StringBuilder xml, FlowNode gateway, String exitRef) {
+        String splitId = "gwx_" + gateway.id();
+        String convId = "conv_" + gateway.id();
+        List<Branch> branches = gateway.branches();
+
+        xml.append("    <exclusiveGateway id=\"").append(splitId).append("\" name=\"")
+                .append(escape(gateway.name())).append("\"/>\n");
+        xml.append("    <exclusiveGateway id=\"").append(convId).append("\" name=\"")
+                .append(escape(gateway.name())).append("-汇聚\"/>\n");
+
+        for (int b = 0; b < branches.size(); b++) {
+            Branch branch = branches.get(b);
+            boolean isDefault = branch.condition() == null || branch.condition().isBlank();
+            String flowId = "sf_gwx_" + gateway.id() + "_" + b;
+
+            if (isDefault) {
+                // 默认分支：无条件流，其他分支都不命中时必然可走
+                xml.append("    <sequenceFlow id=\"").append(flowId).append("\" sourceRef=\"").append(splitId)
+                        .append("\" targetRef=\"").append(entryOf(branch.nodes().getFirst())).append("\"/>\n");
+            } else {
+                xml.append("    <sequenceFlow id=\"").append(flowId).append("\" sourceRef=\"").append(splitId)
+                        .append("\" targetRef=\"").append(entryOf(branch.nodes().getFirst())).append("\">\n")
+                        .append("      <conditionExpression xsi:type=\"tFormalExpression\"><![CDATA[${")
+                        .append(branch.condition().trim()).append("}]]></conditionExpression>\n")
+                        .append("    </sequenceFlow>\n");
+            }
+
+            // 分支子链：链尾经 emitChain 的 exitRef 汇聚到 converge 网关
+            emitChain(xml, branch.nodes(), convId);
+        }
+
+        xml.append("    <sequenceFlow id=\"sf_conv_").append(gateway.id())
+                .append("\" sourceRef=\"").append(convId).append("\" targetRef=\"")
+                .append(exitRef).append("\"/>\n");
     }
 
     private void appendUserTask(StringBuilder xml, FlowNode node) {
@@ -137,32 +191,85 @@ public class BpmnCompiler {
         int approvals = 0;
         for (int i = 1; i < nodes.size() - 1; i++) {
             FlowNode node = nodes.get(i);
-            if (node.id() == null || !ID_PATTERN.matcher(node.id()).matches()) {
-                throw invalid("节点 id 只能包含字母、数字、下划线，且不能以数字开头：" + node.id());
-            }
-            if (!ids.add(node.id())) {
-                throw invalid("节点 id 重复：" + node.id());
-            }
-            if (node.name() == null || node.name().isBlank()) {
-                throw invalid("节点 " + node.id() + " 缺少名称");
-            }
-            if (node.type() == NodeType.APPROVAL) {
-                approvals++;
-                validateApproval(node);
-            } else if (node.type() == NodeType.CC) {
-                if (node.props() == null || node.props().ccUsers() == null || node.props().ccUsers().isEmpty()) {
-                    throw invalid("抄送节点 " + node.name() + " 未配置抄送人");
-                }
-            } else {
-                throw invalid("中间节点只支持 APPROVAL 或 CC：" + node.id());
-            }
-            if (hasCondition(node)) {
-                validateExpression(node);
-            }
+            approvals += validateNode(node, ids, true);
         }
         if (approvals == 0) {
             throw invalid("审批链至少需要 1 个审批节点");
         }
+    }
+
+    /** 校验单个节点（含网关分支递归），返回该节点子树中的审批节点数量。 */
+    private int validateNode(FlowNode node, Set<String> ids, boolean allowGateway) {
+        if (node.id() == null || !ID_PATTERN.matcher(node.id()).matches()) {
+            throw invalid("节点 id 只能包含字母、数字、下划线，且不能以数字开头：" + node.id());
+        }
+        if (!ids.add(node.id())) {
+            throw invalid("节点 id 重复：" + node.id());
+        }
+        if (node.name() == null || node.name().isBlank()) {
+            throw invalid("节点 " + node.id() + " 缺少名称");
+        }
+        int approvals = 0;
+        if (node.type() == NodeType.APPROVAL) {
+            approvals++;
+            validateApproval(node);
+        } else if (node.type() == NodeType.CC) {
+            if (node.props() == null || node.props().ccUsers() == null || node.props().ccUsers().isEmpty()) {
+                throw invalid("抄送节点 " + node.name() + " 未配置抄送人");
+            }
+        } else if (node.type() == NodeType.CONDITION) {
+            if (!allowGateway) {
+                throw invalid("条件网关「" + node.name() + "」不支持嵌套在另一个网关的分支内");
+            }
+            approvals += validateGateway(node, ids);
+            return approvals;
+        } else {
+            throw invalid("节点只支持 APPROVAL / CC / CONDITION：" + node.id());
+        }
+        if (node.hasCondition()) {
+            validateExpression(node.condition(), "节点 " + node.name());
+        }
+        return approvals;
+    }
+
+    private int validateGateway(FlowNode gateway, Set<String> ids) {
+        List<Branch> branches = gateway.branches();
+        if (branches == null || branches.size() < 2) {
+            throw invalid("条件网关「" + gateway.name() + "」至少需要 2 个分支");
+        }
+        int approvals = 0;
+        int defaults = 0;
+        for (int b = 0; b < branches.size(); b++) {
+            Branch branch = branches.get(b);
+            boolean isDefault = branch.condition() == null || branch.condition().isBlank();
+            if (isDefault) {
+                defaults++;
+                if (b < branches.size() - 1) {
+                    throw invalid("条件网关「" + gateway.name() + "」的默认分支（无条件）建议放在最后，"
+                            + "且只能有一个（当前第 " + (b + 1) + " 个分支无条件）");
+                }
+            } else {
+                validateExpression(branch.condition(), "条件网关「" + gateway.name() + "」分支「"
+                        + (branch.name() == null ? b + 1 : branch.name()) + "」");
+            }
+            if (branch.name() == null || branch.name().isBlank()) {
+                throw invalid("条件网关「" + gateway.name() + "」第 " + (b + 1) + " 个分支缺少名称");
+            }
+            if (branch.nodes() == null || branch.nodes().isEmpty()) {
+                throw invalid("条件网关「" + gateway.name() + "」分支「" + branch.name() + "」至少需要 1 个节点");
+            }
+            for (FlowNode child : branch.nodes()) {
+                if (child.type() == NodeType.START || child.type() == NodeType.END) {
+                    throw invalid("条件网关「" + gateway.name() + "」分支内不允许包含 发起/结束 节点");
+                }
+                approvals += validateNode(child, ids, false);
+            }
+        }
+        if (defaults == 0) {
+            throw invalid("条件网关「" + gateway.name() + "」缺少默认分支（条件留空的分支），"
+                    + "所有条件都不满足时无路可走");
+        }
+        return approvals;
     }
 
     private void validateApproval(FlowNode node) {
@@ -192,19 +299,19 @@ public class BpmnCompiler {
         }
     }
 
-    private void validateExpression(FlowNode node) {
-        String expression = node.condition().trim();
-        String lowered = expression.toLowerCase();
+    private void validateExpression(String expression, String owner) {
+        String trimmed = expression.trim();
+        String lowered = trimmed.toLowerCase();
         List<String> forbidden = new ArrayList<>(List.of("t(", "new ", "#", "@", "getclass", "class.forname"));
         for (String token : forbidden) {
             if (lowered.contains(token)) {
-                throw invalid("节点 " + node.name() + " 的条件表达式包含不允许的语法：" + token);
+                throw invalid(owner + " 的条件表达式包含不允许的语法：" + token);
             }
         }
         try {
-            SPEL.parseExpression(expression);
+            SPEL.parseExpression(trimmed);
         } catch (Exception e) {
-            throw invalid("节点 " + node.name() + " 的条件表达式不合法：" + e.getMessage());
+            throw invalid(owner + " 的条件表达式不合法：" + e.getMessage());
         }
     }
 
@@ -213,11 +320,7 @@ public class BpmnCompiler {
     }
 
     private String entryOf(FlowNode node) {
-        return hasCondition(node) ? "gw_in_" + node.id() : node.id();
-    }
-
-    private boolean hasCondition(FlowNode node) {
-        return node.condition() != null && !node.condition().isBlank();
+        return node.hasCondition() ? "gw_in_" + node.id() : node.id();
     }
 
     private String escape(String text) {
