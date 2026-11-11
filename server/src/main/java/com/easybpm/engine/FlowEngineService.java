@@ -327,6 +327,52 @@ public class FlowEngineService {
         return syncProgress(processInstanceId, false);
     }
 
+    /**
+     * 管理员强制转办：与 {@link #transfer} 的区别是不校验原处理人（原处理人可能已离职/停用），
+     * 操作人是管理员。用于审批人离职、停用等导致的待办无人可处理的卡单救援。
+     */
+    @Transactional
+    public ActionResult forceTransfer(String instanceId, String taskId, String operatorId,
+                                      String targetUserId, String comment) {
+        BpmInstance projection = requireProjection(instanceId);
+        if (!InstanceStatus.RUNNING.name().equals(projection.getStatus())) {
+            throw BizException.badRequest("实例已结束，无需转办");
+        }
+        String tenantId = TenantContext.require();
+        Task task = taskService.createTaskQuery().taskId(taskId).taskTenantId(tenantId).singleResult();
+        if (task == null) {
+            HistoricTaskInstance historic = historyService.createHistoricTaskInstanceQuery()
+                    .taskId(taskId).taskTenantId(tenantId).singleResult();
+            if (historic != null) {
+                throw new BizException(ErrorCode.TASK_ALREADY_HANDLED);
+            }
+            throw new BizException(ErrorCode.TASK_NOT_FOUND);
+        }
+        if (!Objects.equals(task.getProcessInstanceId(), projection.getEngineInstanceId())) {
+            throw BizException.badRequest("任务不属于该审批实例");
+        }
+        String originalAssignee = task.getAssignee();
+        if (Objects.equals(originalAssignee, targetUserId)) {
+            throw BizException.badRequest("目标处理人与当前处理人相同");
+        }
+        OrgUser target = orgService.findUser(targetUserId);
+        if (target == null) {
+            throw BizException.badRequest("目标处理人不存在：" + targetUserId);
+        }
+        if (!"ACTIVE".equals(target.getStatus())) {
+            throw BizException.badRequest("目标处理人已停用：" + targetUserId);
+        }
+
+        taskService.setAssignee(taskId, targetUserId);
+        String originalName = originalAssignee == null ? "（空）" : displayName(originalAssignee);
+        String note = "管理员强制转办：" + originalName + " → " + target.getName()
+                + (comment == null || comment.isBlank() ? "" : "；" + comment);
+        insertRecord(projection.getInstanceId(), taskId, task.getTaskDefinitionKey(), task.getName(),
+                operatorId, displayName(operatorId), TaskAction.ADMIN_TRANSFER, note);
+
+        return syncProgress(task.getProcessInstanceId(), false);
+    }
+
     /** TO_START：终止当前引擎实例，实例进入等待发起人重提状态。 */
     private ActionResult rejectToStart(Task task, String userId, String comment) {
         String processInstanceId = task.getProcessInstanceId();
