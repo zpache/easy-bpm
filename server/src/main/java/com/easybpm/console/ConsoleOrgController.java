@@ -17,6 +17,8 @@ import com.easybpm.org.OrgUserRole;
 import com.easybpm.org.OrgUserRoleMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -198,9 +200,12 @@ public class ConsoleOrgController {
     public ApiResponse<RoleAssignResult> assignRole(@PathVariable String roleCode,
                                                     @Valid @RequestBody AssignRoleRequest request) {
         requireAdmin();
+        if (roleCode.isBlank() || roleCode.length() > 64) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "角色编码不能为空或仅含空格，且不能超过64个字符");
+        }
         List<String> current = orgService.findUsersByRole(roleCode);
         LinkedHashSet<String> target = new LinkedHashSet<>(request.userCodes().stream()
-                .filter(c -> c != null && !c.isBlank()).map(String::trim).toList());
+                .map(String::trim).toList());
         List<String> added = new ArrayList<>(target.stream().filter(c -> !current.contains(c)).toList());
         List<String> removed = new ArrayList<>(current.stream().filter(c -> !target.contains(c)).toList());
         for (String userCode : removed) {
@@ -242,16 +247,28 @@ public class ConsoleOrgController {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    public record SaveDeptRequest(@NotBlank String deptCode, @NotBlank String name,
-                                  String parentCode, String leaderId, Integer sortNo) {
+    public record SaveDeptRequest(
+            @NotBlank(message = "部门编码不能为空或仅含空格")
+            @Size(max = 64, message = "部门编码不能超过64个字符") String deptCode,
+            @NotBlank(message = "部门名称不能为空或仅含空格")
+            @Size(max = 128, message = "部门名称不能超过128个字符") String name,
+            String parentCode, String leaderId, Integer sortNo) {
     }
 
-    public record SaveUserRequest(@NotBlank String userCode, @NotBlank String name, String deptCode,
-                                  String leaderCode, String title, String mobile, String email,
-                                  String status, List<String> roleCodes) {
+    public record SaveUserRequest(
+            @NotBlank(message = "人员编码不能为空或仅含空格")
+            @Size(max = 64, message = "人员编码不能超过64个字符") String userCode,
+            @NotBlank(message = "姓名不能为空或仅含空格")
+            @Size(max = 64, message = "姓名不能超过64个字符") String name, String deptCode,
+            String leaderCode, String title, String mobile, String email,
+            String status, List<@NotBlank(message = "角色编码不能为空或仅含空格")
+            @Size(max = 64, message = "角色编码不能超过64个字符") String> roleCodes) {
     }
 
-    public record AssignRoleRequest(List<String> userCodes) {
+    public record AssignRoleRequest(
+            @NotNull(message = "授权人员列表不能为空，清空成员请传空数组")
+            List<@NotBlank(message = "人员编码不能为空或仅含空格")
+            @Size(max = 64, message = "人员编码不能超过64个字符") String> userCodes) {
     }
 
     public record RoleAssignResult(int added, int removed) {
