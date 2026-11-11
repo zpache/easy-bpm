@@ -1,6 +1,7 @@
 package com.easybpm.console;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.easybpm.audit.AuditService;
 import com.easybpm.auth.AuthPrincipal;
 import com.easybpm.auth.ConsoleUser;
@@ -12,6 +13,7 @@ import com.easybpm.common.ApiResponse;
 import com.easybpm.common.BizException;
 import com.easybpm.common.ErrorCode;
 import com.easybpm.common.Ids;
+import com.easybpm.common.PageResult;
 import com.easybpm.engine.BpmInstance;
 import com.easybpm.engine.BpmInstanceMapper;
 import com.easybpm.flow.FlowDefinition;
@@ -30,10 +32,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.Locale;
 
 /**
  * 平台管理员能力：租户全生命周期管理 + 切换租户上下文。
@@ -77,11 +80,24 @@ public class ConsolePlatformController {
     }
 
     @GetMapping("/tenants")
-    public ApiResponse<List<TenantView>> tenants() {
+    public ApiResponse<PageResult<TenantView>> tenants(@RequestParam(defaultValue = "1") int page,
+                                                      @RequestParam(defaultValue = "20") int size,
+                                                      @RequestParam(required = false) String keyword) {
         requirePlatformAdmin();
-        List<Tenant> tenants = tenantMapper.selectList(
-                new LambdaQueryWrapper<Tenant>().orderByDesc(Tenant::getCreatedAt));
-        return ApiResponse.ok(tenants.stream().map(this::toView).toList());
+        int current = Math.max(page, 1);
+        int limit = Math.min(Math.max(size, 1), 100);
+        LambdaQueryWrapper<Tenant> query = new LambdaQueryWrapper<Tenant>()
+                .orderByDesc(Tenant::getCreatedAt).orderByAsc(Tenant::getCode);
+        if (keyword != null && !keyword.isBlank()) {
+            String pattern = "%" + keyword.trim().toLowerCase(Locale.ROOT)
+                    .replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+            query.and(wrapper -> wrapper.apply("LOWER(code) LIKE {0} ESCAPE '!'"
+                    + " OR LOWER(name) LIKE {0} ESCAPE '!'"
+                    + " OR LOWER(remark) LIKE {0} ESCAPE '!'", pattern));
+        }
+        Page<Tenant> result = tenantMapper.selectPage(new Page<>(current, limit), query);
+        return ApiResponse.ok(PageResult.of(result.getRecords().stream().map(this::toView).toList(),
+                result.getTotal(), current, limit));
     }
 
     @PostMapping("/tenants")
