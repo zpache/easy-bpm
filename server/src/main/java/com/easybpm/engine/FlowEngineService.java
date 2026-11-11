@@ -200,6 +200,8 @@ public class FlowEngineService {
         String title = projection.getTitle();
         ResolvedFlow resolved = resolveVariables(definition, schema, command, title);
         Map<String, Object> variables = resolved.variables();
+        // 重提会更换引擎实例 ID，抄送节点需据此回写对外 ID
+        variables.put(CcDelegate.INSTANCE_ID_VAR, projection.getInstanceId());
 
         ProcessInstance newProcess;
         try {
@@ -431,7 +433,10 @@ public class FlowEngineService {
                 variables.put("decision_" + node.id(), "PENDING");
             } else if (node.type() == NodeType.CC) {
                 List<String> ccUsers = new ArrayList<>(node.props().ccUsers());
-                ccUsers.addAll(command.ccUsers());
+                // 发起请求可能不带 ccUsers（仅可选补充），null 时只看节点自身配置
+                if (command.ccUsers() != null) {
+                    ccUsers.addAll(command.ccUsers());
+                }
                 variables.put("cc_" + node.id(), new ArrayList<>(new LinkedHashSet<>(ccUsers)));
             }
         }

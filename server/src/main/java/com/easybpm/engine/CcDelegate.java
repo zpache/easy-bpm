@@ -19,6 +19,12 @@ import java.util.Map;
 @Component("ccDelegate")
 public class CcDelegate implements JavaDelegate {
 
+    /**
+     * 对外实例 ID 的流程变量名。重新提交（TO_START 驳回后重提）会在启动前写入，
+     * 因为此时投影行的 engineInstanceId 还指向旧引擎实例，无法按引擎 ID 反查。
+     */
+    public static final String INSTANCE_ID_VAR = "__instance_id";
+
     private final BpmCcMapper ccMapper;
     private final BpmTaskRecordMapper recordMapper;
     private final BpmInstanceMapper instanceMapper;
@@ -45,10 +51,7 @@ public class CcDelegate implements JavaDelegate {
         Map<String, String> names = orgService.namesOf(userIds);
 
         TenantContext.callAs(tenantId, () -> {
-            // 抄送记录归属对外实例 ID（TO_START 重提后引擎实例 ID 会更换）
-            String externalId = instanceMapper.selectOne(new LambdaQueryWrapper<BpmInstance>()
-                            .eq(BpmInstance::getEngineInstanceId, execution.getProcessInstanceId()))
-                    .getInstanceId();
+            String externalId = resolveInstanceId(execution);
             LocalDateTime now = LocalDateTime.now();
             for (String userId : userIds) {
                 BpmCc cc = new BpmCc();
@@ -75,5 +78,22 @@ public class CcDelegate implements JavaDelegate {
             recordMapper.insert(record);
             return null;
         });
+    }
+
+    /**
+     * 解析抄送记录应归属的对外实例 ID。
+     *
+     * <p>三级取值：① 流程变量（重提场景显式写入）→ ② 按引擎实例 ID 反查投影 →
+     * ③ 引擎实例 ID 本身。③ 覆盖「发起时抄送节点先于实例投影落库执行」的场景，
+     * 首次发起对外 ID 与引擎 ID 相同，取值正确。
+     */
+    private String resolveInstanceId(DelegateExecution execution) {
+        Object fromVariable = execution.getVariable(INSTANCE_ID_VAR);
+        if (fromVariable != null && !String.valueOf(fromVariable).isBlank()) {
+            return String.valueOf(fromVariable);
+        }
+        BpmInstance projection = instanceMapper.selectOne(new LambdaQueryWrapper<BpmInstance>()
+                .eq(BpmInstance::getEngineInstanceId, execution.getProcessInstanceId()));
+        return projection != null ? projection.getInstanceId() : execution.getProcessInstanceId();
     }
 }
