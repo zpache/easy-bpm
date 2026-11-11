@@ -19,9 +19,7 @@
           @keyup.enter="reload"
           @clear="reload"
         />
-        <el-button @click="reload">
-          <el-icon><Refresh /></el-icon>
-        </el-button>
+        <el-button type="primary" @click="reload">查询</el-button>
       </div>
     </div>
 
@@ -74,7 +72,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import TablePagination from '@/components/TablePagination.vue'
 import { ElMessage } from 'element-plus'
-import { Refresh, Search } from '@element-plus/icons-vue'
+import { Search } from '@element-plus/icons-vue'
 import { ccList, markCcRead, workbenchCounts } from '@/api/workbench'
 import type { CcView } from '@/api/types'
 import { statusText, statusType } from '@/utils/labels'

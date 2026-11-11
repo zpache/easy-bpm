@@ -4,6 +4,7 @@
       <!-- 人员 -->
       <el-tab-pane label="人员" name="users">
         <div class="toolbar">
+          <el-button type="primary" @click="openUserDialog()">新增人员</el-button>
           <div class="filters">
             <el-input v-model="userQuery.keyword" placeholder="姓名 / 编码 / 手机号" clearable style="width: 200px"
                       :prefix-icon="Search" @keyup.enter="searchUsers" @clear="searchUsers" />
@@ -14,8 +15,8 @@
               <el-option label="在职" value="ACTIVE" />
               <el-option label="离职" value="INACTIVE" />
             </el-select>
+            <el-button type="primary" @click="searchUsers">查询</el-button>
           </div>
-          <el-button type="primary" @click="openUserDialog()">新增人员</el-button>
         </div>
         <el-table :data="users" v-loading="usersLoading">
           <template #empty><el-empty description="暂无人员数据" :image-size="80" /></template>
