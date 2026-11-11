@@ -48,7 +48,12 @@ easy-bpm/
 │  └─ src/main/resources/db/schema-mysql.sql
 ├─ db/mysql/                     # 生产建表脚本
 ├─ console/                      # 控制台前端（Vue3 + TS + Vite + Element Plus + Pinia）
-└─ docs/                         # 架构与接入文档
+└─ docs/                         # 文档
+   ├─ architecture.md            # 架构说明（分层、多租户、编译链路、数据表）
+   ├─ integration.md             # 接入指南（签名、接口、错误码）
+   ├─ deploy.md                  # 部署与运维（Docker、环境变量、回调配置）
+   ├─ console.md                 # 控制台使用手册（含页面截图）
+   └─ images/                    # 控制台截图
 ```
 
 ## 快速启动
@@ -90,6 +95,18 @@ java -jar target/easy-bpm-server-1.0.0.jar --spring.profiles.active=local
 | 平台管理员 | 租户编码 `platform`，账号 `platadmin / admin123`（角色 PLATFORM_ADMIN） |
 | AppKey / AppSecret | `ak_demo` / `sk_demo_2026` |
 | 演示流程 | `leave` 请假审批、`expense` 费用报销（金额 > 5000 加财务审批） |
+
+## 界面预览
+
+控制台为 Vue 3 + Element Plus 单页应用，完整的页面说明与截图见 **[docs/console.md](docs/console.md)**。
+
+| 仪表盘（管理员可见统计与趋势） | 审批流程设计器 |
+|---|---|
+| ![仪表盘](docs/images/02-dashboard.png) | ![审批流程设计器](docs/images/04-flow-design.png) |
+
+| 审批详情（时间线 + 表单只读渲染） | 平台管理（跨租户运营） |
+|---|---|
+| ![审批详情](docs/images/10-instance-detail.png) | ![平台管理](docs/images/14-platform.png) |
 
 ## 接口一览
 
@@ -220,6 +237,13 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 - 被抄送人通过 `/open/v1/cc` 或控制台「抄送我的」查看，支持未读过滤与标题搜索，标记已读仅限本人；
 - `counts` 接口返回 `ccUnread`，接入方可在自己的消息中心做红点。
 
+### 8. 组织模型与审批人解析
+
+- 组织数据源：人员（`org_user`）、部门（`org_dept`）、角色（`org_user_role`），既可在控制台维护，也可由接入方通过 `/org/sync` 批量同步，同一套 upsert 语义；
+- 「直属主管」解析顺序：人员显式 `leaderCode` → 所在部门主管 → 沿上级部门逐级向上第一个配置了主管的部门；部门主管是本人时跳过本级，避免自审批；
+- 因此部门主管只需在部门上维护一次，部门内人员默认继承，跨部门汇报线才需要给个人单独指定；
+- 审批人解析在**发起时一次性冻结**写入流程变量，BPMN 只负责流转、不回查组织数据（运行期人员变动的影响见「注意事项」待办项）。
+
 ## 阶段计划
 
 | 阶段 | 内容 | 状态 |
@@ -233,6 +257,9 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | P4 | Webhook 回调（outbox + 指数退避重试）、OpenAPI 限流、控制台操作审计 | ✅ |
 | P6 | Docker Compose、部署与运维文档（docs/deploy.md） | ✅ |
 | P7 | 抄送闭环（抄送我的查询/已读）+ 核心链路集成测试基线 | ✅ |
+| P8 | 平台管理员 + 租户全生命周期管理（租户 CRUD、停用/启用、进入租户、切换审计） | ✅ |
+| P9 | 管理员实例视图（全租户实例查询）+ 数据看板（通过率/平均时长/趋势/TOP5） | ✅ |
+| P10 | 组织维护入口（人员/部门/角色）、直属主管继承部门主管、全局时间序列化、统一分页与交互样式 | ✅ |
 
 ## 测试
 

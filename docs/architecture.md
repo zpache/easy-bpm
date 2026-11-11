@@ -58,7 +58,7 @@ POST /open/v1/tasks/{id}/approve
 ### 4.1 三条防线
 
 1. **入口不可伪造**：`tenantId` 只从凭证/JWT 解析，接口参数里没有租户字段。
-2. **SQL 自动加条件**：MyBatis-Plus `TenantLineInnerInterceptor` 对除 `bpm_tenant`、`bpm_tenant_credential` 外的所有表追加 `tenant_id`。
+2. **SQL 自动加条件**：MyBatis-Plus `TenantLineInnerInterceptor` 对除 `bpm_tenant`、`bpm_tenant_credential`、`bpm_console_user` 外的所有表追加 `tenant_id`。
 3. **引擎显式带租户**：部署、启动、任务、历史查询全部传 `tenantId`；跨租户查实例返回 404。
 
 ### 4.2 已实测
@@ -69,6 +69,7 @@ POST /open/v1/tasks/{id}/approve
 ### 4.3 注意
 
 - `bpm_tenant_credential` 必须绕过租户插件（认证发生在租户上下文建立之前），因此凭证相关查询要显式带 `tenant_id`。
+- `bpm_console_user` 同样绕过自动隔离：平台管理员切换租户后，JWT 的 `tid` 是目标租户，鉴权按主键查账号时若自动追加目标租户条件就会查不到记录（表现为「账号不可用」）。代价是该表的隔离从框架兜底降级为**查询点人工约定**——所有查询必须显式带 `tenant_id`（登录按 `tenantId + username` 匹配、新建账号显式赋值、统计显式 eq 过滤），`ConsoleUserMapper` 上有约定注释，新增查询请遵循。
 - 新增业务表时必须包含 `tenant_id` 列，否则插件生成的 SQL 会报错。
 
 ## 5. 审批链编译
@@ -97,6 +98,25 @@ POST /open/v1/tasks/{id}/approve
 | `cond_<nodeId>` | 条件求值结果（Boolean） |
 | `cc_<nodeId>` | 抄送人列表 |
 
+### 5.1 审批人解析
+
+审批人类型（`ApproverType`）与解析来源：
+
+| 类型 | 解析方式 |
+|---|---|
+| `SPECIFIED` | 节点上直接配置的人员编码 |
+| `ROLE` | 角色下全部人员（`bpm_org_user_role`） |
+| `INITIATOR_LEADER` | 沿直属主管链向上取第 N 级 |
+| `DEPT_LEADER` | 发起人所属部门的部门主管 |
+| `FORM_FIELD` | 从 `formData` 指定字段取人员（支持单值/数组/逗号分隔） |
+| `SELF` | 发起人本人 |
+
+解析完成后统一经 `OrgService.filterActive` 过滤掉不存在或已停用的人员，再按节点「审批人为空兜底策略」处理（`FAIL` 拦截发起 / `AUTO_PASS` 自动通过 / `AUTO_REJECT` 自动驳回）。
+
+**直属主管链（`OrgService.findLeader`）**：人员显式 `leaderCode` 优先；未设置时继承所在部门主管；本部门无主管则沿父部门逐级向上；部门主管是本人时跳过本级（避免自审批），部门树遍历带 visited 防环。这样部门主管只需维护一次，部门内人员默认全部继承，仅跨部门汇报线需要给个人单独指定。
+
+解析结果在**发起时**一次性计算并写入流程变量 `ap_<nodeId>`，引擎运行期不再回查组织数据。
+
 ## 6. 数据表
 
 | 表 | 作用 |
@@ -111,6 +131,7 @@ POST /open/v1/tasks/{id}/approve
 | `bpm_task_record` | 审计时间线 |
 | `bpm_cc` | 抄送 |
 | `bpm_webhook_log` | 回调投递日志（P4） |
+| `bpm_audit_log` | 控制台敏感操作审计（流程/凭证/租户/组织） |
 | `ACT_*` | Flowable 引擎表（自动创建） |
 
 ## 7. 并发与一致性
@@ -121,8 +142,11 @@ POST /open/v1/tasks/{id}/approve
 
 ## 8. 演进方向
 
-- P2：`TO_START` 驳回后重提、撤回、转交、加签、组织同步接口；
-- P3：定义可视化编辑、版本回滚、表单 schema 校验（不做表单设计器，见 README「业务表单零设计」）；
-- P4：事务提交后 Webhook（HMAC 签名、指数退避重试）、限流、审计日志；
-- P5：Vue3 控制台；
-- P6：容器化与运维文档。
+已完成：P0 技术验证 → P1 多租户纵切 → P2 驳回/撤回/转交/重提/组织同步 → P3 版本回滚与表单校验 → P4 Webhook/限流/审计 → P5/P10 控制台（含组织维护、平台管理、实例视图、数据看板）→ P6 容器化 → P7 抄送闭环与集成测试 → P8 平台管理员与租户管理 → P9 管理员实例视图与看板。
+
+待建设（按优先级）：
+
+- **通知渠道**：webhook 事件目前仅 `instance.completed` / `instance.canceled`，需补 `instance.started`、`task.created`（接入方感知新待办）与审批超时提醒；
+- **审批人运行期兜底**：实例运行中审批人离职/停用导致待办卡死的重解析转办（方案见 README 注意事项）；
+- **加签**：审批中临时增补审批人（会签/或签语义需分别定义）；
+- Java/Node SDK、SSO 单点登录、敏感字段加密存储、Redis 全局限流（多实例部署时）。

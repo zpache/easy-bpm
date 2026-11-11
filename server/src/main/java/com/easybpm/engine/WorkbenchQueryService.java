@@ -340,8 +340,14 @@ public class WorkbenchQueryService {
                 .like(BpmInstance::getTitle, keyword)
                 .eq(flowCode != null && !flowCode.isBlank(), BpmInstance::getFlowCode, flowCode)
                 .last("limit " + MAX_KEYWORD_HITS));
-        // 待办/已办走 Flowable 引擎查询，需要引擎实例 ID
-        return new ArrayList<>(matches.stream().map(BpmInstance::getEngineInstanceId).toList());
+        // 待办/已办走 Flowable 引擎查询，需要引擎实例 ID；
+        // 草稿或历史行可能没有 engineInstanceId，必须过滤掉空值，否则 Flowable 会抛
+        // "None of the given process instance ids can be null" 导致整个查询失败。
+        return matches.stream()
+                .map(BpmInstance::getEngineInstanceId)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
     }
 
     private int offset(int page, int size) {
