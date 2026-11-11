@@ -32,6 +32,7 @@ export function actionText(action?: string): string {
     case 'RESUBMIT': return '重新提交'
     case 'CC': return '抄送'
     case 'AUTO_PASS': return '自动通过'
+    case 'ADMIN_TRANSFER': return '强制转办'
     default: return action ?? '-'
   }
 }
@@ -45,6 +46,7 @@ export function actionType(action?: string): 'primary' | 'success' | 'danger' | 
     case 'REVOKE': return 'warning'
     case 'RESUBMIT': return 'primary'
     case 'CC': return 'info'
+    case 'ADMIN_TRANSFER': return 'warning'
     default: return 'info'
   }
 }

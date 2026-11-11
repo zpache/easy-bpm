@@ -87,3 +87,7 @@ export function dashboardStats() {
 export function allInstances(params: PageParams) {
   return http.get<never, PageResult<InstanceView>>('/api/instances', { params: toQuery(params) })
 }
+
+export function forceTransferTask(instanceId: string, taskId: string, targetUserCode: string, comment?: string) {
+  return http.post<never, unknown>(`/api/instances/${instanceId}/force-transfer`, { taskId, targetUserCode, comment })
+}
