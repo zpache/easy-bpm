@@ -27,30 +27,36 @@
       </template>
       <el-table-column prop="instanceTitle" label="审批标题" min-width="220" show-overflow-tooltip>
         <template #default="{ row }">
-          <el-link type="primary" :underline="false" @click.stop="goDetail(row.processInstanceId)">
+          <el-link v-if="row.instanceTitle" type="primary" :underline="false" @click.stop="goDetail(row.instanceId)">
             {{ row.instanceTitle }}
           </el-link>
+          <span v-else class="muted">（实例信息缺失）</span>
         </template>
       </el-table-column>
-      <el-table-column prop="flowName" label="流程" width="150" show-overflow-tooltip />
+      <el-table-column prop="flowName" label="流程" width="150" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.flowName || '-' }}</template>
+      </el-table-column>
       <el-table-column prop="nodeName" label="节点" width="130" show-overflow-tooltip />
-      <el-table-column prop="initiatorName" label="发起人" width="100" />
+      <el-table-column prop="initiatorName" label="发起人" width="100">
+        <template #default="{ row }">{{ row.initiatorName || '-' }}</template>
+      </el-table-column>
       <el-table-column v-if="tab === 'todo'" prop="assigneeName" label="处理人" width="100" />
-      <el-table-column v-if="tab === 'todo'" prop="createTime" label="到达时间" width="165">
-        <template #default="{ row }">{{ fmtDateTime(row.createTime) }}</template>
+      <el-table-column v-if="tab === 'todo'" prop="createdAt" label="到达时间" width="165">
+        <template #default="{ row }">{{ fmtDateTime(row.createdAt) }}</template>
       </el-table-column>
       <template v-else>
         <el-table-column label="耗时" width="100">
-          <template #default="{ row }">{{ duration(row.createTime, row.endTime) }}</template>
+          <template #default="{ row }">{{ duration(row.createdAt, row.handledAt) }}</template>
         </el-table-column>
-        <el-table-column prop="endTime" label="处理时间" width="165">
-          <template #default="{ row }">{{ fmtDateTime(row.endTime) }}</template>
+        <el-table-column prop="handledAt" label="处理时间" width="165">
+          <template #default="{ row }">{{ fmtDateTime(row.handledAt) }}</template>
         </el-table-column>
         <el-table-column label="我的处理" width="100">
           <template #default="{ row }">
-            <el-tag size="small" :type="actionType(row.action)" effect="light" round>
+            <el-tag v-if="row.action" size="small" :type="actionType(row.action)" effect="light" round>
               {{ actionText(row.action) }}
             </el-tag>
+            <span v-else class="muted">-</span>
           </template>
         </el-table-column>
       </template>
@@ -152,7 +158,8 @@ function goDetail(instanceId: string) {
 }
 
 function goDetailRow(row: TaskView) {
-  goDetail(row.processInstanceId)
+  if (!row.instanceId) return
+  goDetail(row.instanceId)
 }
 
 function duration(start?: string, end?: string) {
@@ -180,5 +187,6 @@ onMounted(load)
 }
 .toolbar-tabs :deep(.el-tabs__header) { margin-bottom: 0; }
 .toolbar-right { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; }
+.muted { color: #a8abb2; }
 :deep(.el-table__row) { cursor: pointer; }
 </style>

@@ -45,10 +45,10 @@ export interface FlowVersion {
 
 export interface TaskView {
   taskId: string
-  processInstanceId: string
+  instanceId: string
   nodeId?: string
   nodeName?: string
-  assignee?: string
+  assigneeId?: string
   assigneeName?: string
   instanceTitle?: string
   flowCode?: string
@@ -56,8 +56,8 @@ export interface TaskView {
   initiatorName?: string
   status: 'PENDING' | 'FINISHED'
   action?: string
-  createTime?: string
-  endTime?: string
+  createdAt?: string
+  handledAt?: string
 }
 
 export interface InstanceView {

@@ -41,7 +41,9 @@
       <el-table :data="detail.pendingTasks" size="default">
         <el-table-column prop="nodeName" label="节点" />
         <el-table-column prop="assigneeName" label="处理人" />
-        <el-table-column prop="createTime" label="到达时间" width="180" />
+        <el-table-column prop="createdAt" label="到达时间" width="180">
+          <template #default="{ row }">{{ fmtDateTime(row.createdAt) }}</template>
+        </el-table-column>
       </el-table>
     </el-card>
 

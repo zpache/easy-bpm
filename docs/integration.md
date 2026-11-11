@@ -69,6 +69,8 @@ const sign = crypto.createHmac('sha256', appSecret).update(payload).digest('hex'
 
 `code=0` 成功；其余为业务错误，HTTP 状态码同时生效。出错时把 `traceId` 提供给中台排查。
 
+时间字段：所有 `LocalDateTime` 统一输出 **`yyyy-MM-dd HH:mm:ss`**（服务器本地时区）。请求入参同时兼容 `2026-11-10 08:43:05` 与 ISO `2026-11-10T08:43:05` 两种写法，秒与毫秒可省略，历史接入方无需调整。
+
 ### 3.1 查询可用流程
 
 ```
@@ -324,6 +326,12 @@ GET /open/v1/instances/{instanceId}
 | `DEPT_LEADER` | — | 发起人部门主管 |
 | `FORM_FIELD` | `approvers: ["字段key"]` | 表单里的人员编码 |
 | `SELF` | — | 发起人本人 |
+
+补充说明：
+
+- **`INITIATOR_LEADER` 的主管链**：人员显式设置的直属主管优先；未设置时继承所在部门主管；本部门无主管则沿上级部门逐级向上；部门主管是本人时跳过本级。因此接入方只需同步部门主管（`/org/sync` 的 `depts[].leaderId`），部门内人员即可解析到正确的直属主管，无需逐人维护 `leaderCode`；跨部门汇报线才需单独指定。
+- **审批人为空兜底**（节点配置 `emptyStrategy`）：`FAIL` 拦截发起（默认，返回 `NO_APPROVER`）/ `AUTO_PASS` 自动通过并留痕 / `AUTO_REJECT` 自动驳回。
+- 审批人解析在一次发起时计算并冻结，之后的组织变动不影响该实例（运行期兜底转办为后续能力）。
 
 ### 条件
 
