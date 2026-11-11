@@ -45,13 +45,16 @@
         <el-table-column prop="createdAt" label="创建时间" width="180">
           <template #default="{ row }">{{ fmtDateTime(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="210" fixed="right">
           <template #default="{ row }">
             <el-popconfirm title="轮换后旧 AppSecret 立即失效，接入方需同步更新，确认？" width="260" @confirm="onRotate(row)">
               <template #reference><el-button size="small" type="warning" plain>轮换密钥</el-button></template>
             </el-popconfirm>
             <el-popconfirm v-if="row.status === 'ACTIVE'" title="停用后该凭证无法调用 OpenAPI，确认？" width="240" @confirm="onDisable(row)">
               <template #reference><el-button size="small" type="danger" plain>停用</el-button></template>
+            </el-popconfirm>
+            <el-popconfirm v-else title="启用后该凭证恢复调用 OpenAPI，AppSecret 不变，确认？" width="260" @confirm="onEnable(row)">
+              <template #reference><el-button size="small" type="success" plain>启用</el-button></template>
             </el-popconfirm>
           </template>
         </el-table-column>
@@ -103,7 +106,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { createCredential, disableCredential, listCredentials, rotateCredential, tenantInfo } from '@/api/tenant'
+import { createCredential, disableCredential, enableCredential, listCredentials, rotateCredential, tenantInfo } from '@/api/tenant'
 import { fmtDateTime } from '@/utils/format'
 import type { CredentialSecretView, TenantCredentialView, TenantInfo } from '@/api/types'
 
@@ -174,6 +177,12 @@ async function onRotate(row: TenantCredentialView) {
 async function onDisable(row: TenantCredentialView) {
   await disableCredential(row.id)
   ElMessage.success('已停用')
+  await load()
+}
+
+async function onEnable(row: TenantCredentialView) {
+  await enableCredential(row.id)
+  ElMessage.success('已启用')
   await load()
 }
 

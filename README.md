@@ -170,7 +170,8 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 | POST | `/platform/tenants/{id}/disable\|enable` | 停用 / 启用租户（停用后该租户控制台登录与 OpenAPI 全部拒绝） |
 | POST | `/platform/tenants/{id}/switch` | 平台管理员切换进入目标租户（签发临时 token，前端可一键返回平台视角） |
 | POST | `/tenant/credentials/{id}/rotate` | 轮换 AppSecret（旧密钥立即失效，新密钥仅此一次返回） |
-| POST | `/tenant/credentials/{id}/disable` | 停用凭证 |
+| POST | `/tenant/credentials/{id}/disable` | 停用凭证（立即拒绝 OpenAPI 调用） |
+| POST | `/tenant/credentials/{id}/enable` | 启用已停用的凭证（AppSecret 不变；已过期凭证需先轮换） |
 | GET | `/dashboard/summary` | 首页统计 |
 
 ## P1 已验证场景

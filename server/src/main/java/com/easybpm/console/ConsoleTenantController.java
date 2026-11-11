@@ -112,6 +112,27 @@ public class ConsoleTenantController {
         return ApiResponse.ok();
     }
 
+    /**
+     * 启用已停用的凭证。AppKey / AppSecret 保持不变，接入方无需改配置。
+     * 已过期的凭证不允许直接启用（否则调用仍会被鉴权拒绝），需先轮换密钥重新签发。
+     */
+    @PostMapping("/credentials/{id}/enable")
+    public ApiResponse<Void> enable(@PathVariable String id) {
+        requireAdmin();
+        TenantCredential credential = requireOwned(id);
+        if ("ACTIVE".equals(credential.getStatus())) {
+            return ApiResponse.ok();
+        }
+        if (credential.getExpireAt() != null && credential.getExpireAt().isBefore(LocalDateTime.now())) {
+            throw new BizException(ErrorCode.CONFLICT, "凭证已过期，请轮换密钥并设置新的过期时间后再启用");
+        }
+        credential.setStatus("ACTIVE");
+        credentialMapper.updateById(credential);
+        audit.record("CREDENTIAL_ENABLE", "CREDENTIAL", credential.getId(),
+                "启用凭证「" + credential.getName() + "」，AppKey=" + credential.getAppKey());
+        return ApiResponse.ok();
+    }
+
     private TenantCredential requireOwned(String id) {
         TenantCredential credential = credentialMapper.selectById(id);
         if (credential == null || !credential.getTenantId().equals(CurrentUser.require().tenantId())) {

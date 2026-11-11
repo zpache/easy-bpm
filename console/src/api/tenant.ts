@@ -25,3 +25,7 @@ export function rotateCredential(id: string) {
 export function disableCredential(id: string) {
   return http.post<never, void>(`/api/tenant/credentials/${id}/disable`)
 }
+
+export function enableCredential(id: string) {
+  return http.post<never, void>(`/api/tenant/credentials/${id}/enable`)
+}
