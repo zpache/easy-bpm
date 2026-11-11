@@ -72,17 +72,13 @@
         </el-table-column>
       </el-table>
 
-      <div class="pager">
-        <el-pagination
-          v-model:current-page="page"
-          v-model:page-size="size"
-          :total="total"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next"
-          @current-change="load"
-          @size-change="reload"
-        />
-      </div>
+      <TablePagination
+        v-model:current-page="page"
+        v-model:page-size="size"
+        :total="total"
+        :loading="loading"
+        @change="load"
+      />
     </el-card>
 
     <!-- 新建租户 -->
@@ -143,6 +139,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import TablePagination from '@/components/TablePagination.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
@@ -294,5 +291,4 @@ onMounted(load)
 .toolbar-right { display: flex; align-items: center; }
 .code-cell { font-family: 'SFMono-Regular', Consolas, Menlo, monospace; }
 .switch-alert { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.pager { display: flex; justify-content: flex-end; margin-top: 12px; }
 </style>

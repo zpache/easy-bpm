@@ -1,14 +1,14 @@
 <template>
   <el-card>
     <div class="toolbar">
-      <el-select v-model="status" placeholder="全部状态" clearable style="width: 140px" @change="load">
+      <el-select v-model="status" placeholder="全部状态" clearable style="width: 140px" @change="reload">
         <el-option label="进行中" value="RUNNING" />
         <el-option label="已通过" value="APPROVED" />
         <el-option label="已驳回" value="REJECTED" />
         <el-option label="已撤回" value="CANCELED" />
       </el-select>
-      <el-input v-model="keyword" placeholder="按标题搜索" clearable style="width: 220px; margin-left: 8px" @keyup.enter="load" @clear="load" />
-      <el-button style="margin-left: 8px" @click="load">搜索</el-button>
+      <el-input v-model="keyword" placeholder="按标题搜索" clearable style="width: 220px; margin-left: 8px" @keyup.enter="reload" @clear="reload" />
+      <el-button style="margin-left: 8px" @click="reload">搜索</el-button>
     </div>
 
     <el-table :data="instances" v-loading="loading">
@@ -32,13 +32,12 @@
         <template #default="{ row }">{{ fmtDateTime(row.endedAt) }}</template>
       </el-table-column>
     </el-table>
-    <el-pagination
+    <TablePagination
       v-model:current-page="page"
-      :page-size="size"
+      v-model:page-size="size"
       :total="total"
-      layout="total, prev, pager, next"
-      style="margin-top: 12px; justify-content: flex-end"
-      @current-change="load"
+      :loading="loading"
+      @change="load"
     />
   </el-card>
 </template>
@@ -46,6 +45,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import TablePagination from '@/components/TablePagination.vue'
 import { submittedInstances } from '@/api/workbench'
 import { fmtDateTime } from '@/utils/format'
 import type { InstanceView } from '@/api/types'
@@ -55,7 +55,7 @@ const router = useRouter()
 const instances = ref<InstanceView[]>([])
 const total = ref(0)
 const page = ref(1)
-const size = ref(10)
+const size = ref(20)
 const status = ref('')
 const keyword = ref('')
 const loading = ref(false)
@@ -74,6 +74,11 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function reload() {
+  page.value = 1
+  load()
 }
 
 function goDetail(instanceId: string) {

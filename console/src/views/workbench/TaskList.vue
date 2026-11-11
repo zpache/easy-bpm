@@ -62,17 +62,13 @@
       </el-table-column>
     </el-table>
 
-    <div class="pager">
-      <el-pagination
-        v-model:current-page="page"
-        v-model:page-size="size"
-        :total="total"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="load"
-        @size-change="reload"
-      />
-    </div>
+    <TablePagination
+      v-model:current-page="page"
+      v-model:page-size="size"
+      :total="total"
+      :loading="loading"
+      @change="load"
+    />
 
     <el-dialog v-model="handleVisible" :title="handleAction === 'approve' ? '同意' : '驳回'" width="440px">
       <el-input v-model="comment" type="textarea" :rows="3" placeholder="审批意见" />
@@ -87,6 +83,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import TablePagination from '@/components/TablePagination.vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import { approveTask, doneTasks, rejectTask, todoTasks } from '@/api/workbench'
@@ -100,7 +97,7 @@ const tab = ref((route.meta.tab as string) || 'todo')
 const tasks = ref<TaskView[]>([])
 const total = ref(0)
 const page = ref(1)
-const size = ref(10)
+const size = ref(20)
 const keyword = ref('')
 const loading = ref(false)
 const handleVisible = ref(false)
@@ -183,6 +180,5 @@ onMounted(load)
 }
 .toolbar-tabs :deep(.el-tabs__header) { margin-bottom: 0; }
 .toolbar-right { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; }
-.pager { display: flex; justify-content: flex-end; margin-top: 14px; }
 :deep(.el-table__row) { cursor: pointer; }
 </style>

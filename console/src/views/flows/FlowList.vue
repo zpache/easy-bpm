@@ -30,17 +30,13 @@
       </el-table-column>
     </el-table>
 
-    <div class="pager">
-      <el-pagination
-        v-model:current-page="page"
-        v-model:page-size="size"
-        :total="total"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="load"
-        @size-change="reload"
-      />
-    </div>
+    <TablePagination
+      v-model:current-page="page"
+      v-model:page-size="size"
+      :total="total"
+      :loading="loading"
+      @change="load"
+    />
 
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑流程' : '新建流程'" width="520px">
       <el-form :model="form" label-width="90px">
@@ -68,6 +64,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import TablePagination from '@/components/TablePagination.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteFlow, disableFlow, enableFlow, pageFlows, saveFlow } from '@/api/flows'
 import { useAuthStore } from '@/stores/auth'
@@ -181,5 +178,4 @@ onMounted(load)
 
 <style scoped>
 .toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
-.pager { display: flex; justify-content: flex-end; margin-top: 12px; }
 </style>

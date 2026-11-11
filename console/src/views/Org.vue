@@ -58,17 +58,13 @@
             </template>
           </el-table-column>
         </el-table>
-        <div class="pager">
-          <el-pagination
-            v-model:current-page="userPage"
-            v-model:page-size="userSize"
-            :total="userTotal"
-            :page-sizes="[10, 20, 50]"
-            layout="total, sizes, prev, pager, next"
-            @current-change="loadUsers"
-            @size-change="searchUsers"
-          />
-        </div>
+        <TablePagination
+          v-model:current-page="userPage"
+          v-model:page-size="userSize"
+          :total="userTotal"
+          :loading="usersLoading"
+          @change="loadUsers"
+        />
       </el-tab-pane>
 
       <!-- 部门 -->
@@ -223,6 +219,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import TablePagination from '@/components/TablePagination.vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormItemRule, FormRules } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
@@ -250,7 +247,7 @@ const rolesLoading = ref(false)
 const usersLoading = ref(false)
 const saving = ref(false)
 const userPage = ref(1)
-const userSize = ref(10)
+const userSize = ref(20)
 const userTotal = ref(0)
 const userQuery = reactive({ keyword: '', deptCode: '', status: '' })
 
@@ -512,5 +509,4 @@ onMounted(() => {
 .filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tab-tip { font-size: 12px; color: #8a919f; }
 .field-tip { font-size: 12px; color: #8a919f; line-height: 1.4; margin-top: 2px; }
-.pager { display: flex; justify-content: flex-end; margin-top: 12px; }
 </style>
