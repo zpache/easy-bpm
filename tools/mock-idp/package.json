@@ -1,0 +1,13 @@
+{
+  "name": "easy-bpm-mock-idp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "本地 OIDC 测试 IdP（oidc-provider），用于 easy-bpm 控制台 SSO 联调",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "oidc-provider": "^8.6.0"
+  }
+}
