@@ -24,10 +24,11 @@
           <div class="node-name">{{ node.name }}</div>
           <div class="gateway-branches">
             <div v-for="(branch, bi) in node.branches ?? []" :key="bi" class="branch-panel"
-                 :class="{ 'branch-default': !branch.condition?.trim() }">
+                 :class="{ 'branch-default': bi === (node.branches?.length ?? 0) - 1 && !branch.condition?.trim() }">
               <div class="branch-head">
                 <span class="branch-name">{{ branch.name }}</span>
-                <el-tag v-if="!branch.condition?.trim()" size="small" type="info" effect="plain">默认</el-tag>
+                <el-tag v-if="bi === (node.branches?.length ?? 0) - 1 && !branch.condition?.trim()" size="small" type="info" effect="plain">默认</el-tag>
+                <el-tag v-else-if="!branch.condition?.trim()" size="small" type="danger" effect="plain">待填条件</el-tag>
                 <el-tag v-else size="small" type="warning" effect="plain">{{ branch.condition }}</el-tag>
               </div>
               <template v-for="(child, ci) in branch.nodes ?? []" :key="child.id + ci">
@@ -167,7 +168,8 @@
         <div v-for="(branch, bi) in gatewayDraft.branches" :key="bi" class="gw-branch">
           <div class="gw-branch-head">
             <span class="gw-branch-title">分支 {{ bi + 1 }}</span>
-            <el-tag v-if="!branch.condition?.trim()" size="small" type="info">默认分支</el-tag>
+            <el-tag v-if="bi === (gatewayDraft?.branches?.length ?? 0) - 1" size="small" type="info">默认分支</el-tag>
+            <el-tag v-else-if="!branch.condition?.trim()" size="small" type="danger">待填写条件</el-tag>
             <el-button v-if="bi < (gatewayDraft?.branches?.length ?? 0) - 1" link type="danger" size="small"
                        style="margin-left: auto" @click="removeGatewayBranch(bi)">删除分支</el-button>
           </div>
