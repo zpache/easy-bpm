@@ -130,3 +130,62 @@ JWT 不进 URL：回调只带一次性 ticket，前端换到 token 后与密码�
 - 未实现 SAML 2.0 与 SCIM 增量同步（组织同步仍走 `/open/v1/org/sync`）；
 - 未实现单点登出（IdP 侧退出后本地会话不会同步失效，最长残留一个 token TTL）；
 - 授权接口未单独限流，建议在网关层对 `/api/auth/sso/*` 做频率限制。
+
+## 8. 测试指南
+
+分三层由浅入深，Level 0/1 不需要真实 IdP 和 Docker。
+
+### 8.1 Level 0：无 IdP 冒烟（只验服务端骨架与防伪逻辑）
+
+服务启动后（默认 `http://localhost:8090`）：
+
+```bash
+# 1. 未配置 IdP：返回空数组
+curl -s 'http://localhost:8090/api/auth/sso/providers?tenantCode=demo'
+
+# 2. 配置一个假 IdP 后（Issuer 随便填），providers 应返回 [{code:"default",name:...}]
+# 3. 授权跳转：issuer 的 discovery 不可达时会返回 JSON 错误而非 302
+curl -s -o /dev/null -w '%{http_code}' 'http://localhost:8090/api/auth/sso/authorize?tenantCode=demo'
+
+# 4. 伪造 state 回调 → 302 到 /sso/callback?error=STATE_INVALID
+curl -s -o /dev/null -w '%{redirect_url}' 'http://localhost:8090/api/auth/sso/callback?code=x&state=fake'
+
+# 5. 伪造 ticket 换登录态 → 明确报「登录凭证已失效」
+curl -s -X POST 'http://localhost:8090/api/auth/sso/exchange' \
+  -H 'Content-Type: application/json' -d '{"ticket":"fake"}'
+```
+
+### 8.2 Level 1：本地 mock IdP 全链路（推荐）
+
+仓库自带轻量 OIDC 测试 IdP（`tools/mock-idp/`，基于 oidc-provider，Node 18+，无需 Docker）：
+
+```bash
+# 1. 启动 mock IdP（端口 4444）
+cd tools/mock-idp && npm install && npm start
+
+# 2. 平台管理员登录控制台 → 平台管理 → 目标租户 → SSO：
+#    Issuer=http://localhost:4444  Client ID=easy-bpm  Client Secret=mock-secret-2026
+#    点「测试连接」应提示成功；保存并启用
+
+# 3. 退出后登录页输入该租户编码 → 出现「使用 xxx 登录」→ 点击，
+#    在 mock IdP 登录页随便输入一个邮箱（如 zhangsan@mock.local）提交
+```
+
+按以下顺序验收（每一步都对应真实风险）：
+
+| # | 操作 | 预期 |
+|---|---|---|
+| 1 | 首次企业登录（zhangsan@mock.local） | 拒绝，提示「尚未开通控制台账号」 |
+| 2 | 平台管理 → SSO → 企业身份 | 出现一条 PENDING 记录，含该邮箱与姓名 |
+| 3 | 先给该租户建本地账号，再点「绑定」选它 | 绑定成功；再次企业登录 → 直接进入控制台 |
+| 4 | F12 复制回调 URL 中的 ticket，再次 POST /exchange | 第二次失败（ticket 单次消费） |
+| 5 | 重复第 1 步的 IdP 回调 URL（原样重放） | STATE_INVALID（state 一次性） |
+| 6 | 绑定时勾选「清空本地密码」→ 用原密码登录 | 失败（SSO 专属账号走不了本地登录） |
+| 7 | 账号停用后再次企业登录 | ACCOUNT_DISABLED（IdP 认证通过也进不来） |
+| 8 | 「测试连接」把 Issuer 改错一个字符再测 | 测试连接失败，报 discovery 不可达或 issuer 不一致 |
+| 9 | 登录页输入不存在的租户编码 | 不显示企业登录按钮，providers 返回空 |
+
+### 8.3 Level 2：真实 IdP 验收
+
+用 Keycloak（见 2.1）或企业 IdP 重复 8.2 的 1/2/3/7/8 项即可。注意生产三项配置：
+`EASY_BPM_SSO_REDIRECT_URI`、`EASY_BPM_CONSOLE_BASE_URL` 与 IdP 侧登记的回调地址三者完全一致。
