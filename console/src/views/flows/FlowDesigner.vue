@@ -69,7 +69,7 @@
           </div>
           <el-tag v-if="node.condition" size="small" type="warning" style="margin-top: 6px">条件：{{ node.condition }}</el-tag>
         </div>
-        <div class="connector">
+        <div v-if="node.type !== 'END'" class="connector">
           <template v-if="canInsertAfter(index)">
             <span class="seg"></span>
             <el-button circle size="small" class="insert-btn" @click.stop="insertAfter(index)">＋</el-button>
