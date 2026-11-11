@@ -1,10 +1,12 @@
 package com.easybpm.flow;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.easybpm.common.BizException;
 import com.easybpm.common.ErrorCode;
 import com.easybpm.common.Ids;
 import com.easybpm.common.JsonCodec;
+import com.easybpm.common.PageResult;
 import com.easybpm.tenant.TenantContext;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.repository.Deployment;
@@ -42,6 +44,16 @@ public class FlowDefinitionService {
     public List<FlowDefinition> list() {
         return definitionMapper.selectList(new LambdaQueryWrapper<FlowDefinition>()
                 .orderByDesc(FlowDefinition::getUpdatedAt));
+    }
+
+    public PageResult<FlowDefinition> page(int page, int size) {
+        int current = Math.max(page, 1);
+        int limit = Math.min(Math.max(size, 1), 100);
+        Page<FlowDefinition> result = definitionMapper.selectPage(new Page<>(current, limit),
+                new LambdaQueryWrapper<FlowDefinition>()
+                        .orderByDesc(FlowDefinition::getUpdatedAt)
+                        .orderByAsc(FlowDefinition::getCode));
+        return PageResult.of(result.getRecords(), result.getTotal(), current, limit);
     }
 
     public List<FlowDefinition> listPublished() {

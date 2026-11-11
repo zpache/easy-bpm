@@ -1,8 +1,12 @@
 import http from '@/api/request'
-import type { FlowDefinition, FlowVersion } from './types'
+import type { FlowDefinition, FlowVersion, PageResult } from './types'
 
 export function listFlows() {
   return http.get<never, FlowDefinition[]>('/api/flows')
+}
+
+export function pageFlows(page: number, size: number) {
+  return http.get<never, PageResult<FlowDefinition>>('/api/flows', { params: { page, size } })
 }
 
 export function fetchFlow(code: string) {

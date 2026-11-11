@@ -6,6 +6,7 @@ import com.easybpm.common.ApiResponse;
 import com.easybpm.common.BizException;
 import com.easybpm.common.ErrorCode;
 import com.easybpm.common.JsonCodec;
+import com.easybpm.common.PageResult;
 import com.easybpm.flow.FlowDefinition;
 import com.easybpm.flow.FlowDefinitionService;
 import com.easybpm.flow.FlowVersion;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
@@ -42,6 +44,14 @@ public class ConsoleFlowController {
     @GetMapping
     public ApiResponse<List<FlowView>> list() {
         return ApiResponse.ok(definitions.list().stream().map(this::toView).toList());
+    }
+
+    @GetMapping(params = "page")
+    public ApiResponse<PageResult<FlowView>> page(@RequestParam int page,
+                                                 @RequestParam(defaultValue = "20") int size) {
+        PageResult<FlowDefinition> result = definitions.page(page, size);
+        return ApiResponse.ok(PageResult.of(result.list().stream().map(this::toView).toList(),
+                result.total(), result.page(), result.size()));
     }
 
     @GetMapping("/{code}")

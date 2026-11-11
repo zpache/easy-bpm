@@ -119,7 +119,9 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 |---|---|---|
 | POST | `/auth/login` | 租户编码 + 账号 + 密码登录 |
 | GET | `/auth/me` | 当前登录信息 |
-| GET/POST | `/flows` | 流程定义列表 / 保存 |
+| GET | `/flows` | 流程定义全量列表（供流程选择器使用） |
+| GET | `/flows?page=1&size=20` | 流程定义分页列表，返回 list/total/page/size，每页最多 100 条 |
+| POST | `/flows` | 保存流程定义 |
 | POST | `/flows/{code}/publish` | 发布（编译 BPMN 并部署） |
 | POST | `/flows/{code}/disable` | 停用 |
 | DELETE | `/flows/{code}` | 删除从未发布过的草稿 |
