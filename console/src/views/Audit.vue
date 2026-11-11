@@ -4,9 +4,9 @@
       <el-select v-model="action" placeholder="全部操作" clearable style="width: 180px" @change="search">
         <el-option v-for="item in actionOptions" :key="item.value" :label="item.label" :value="item.value" />
       </el-select>
-      <el-input v-model="keyword" placeholder="目标 / 操作人 / 详情" clearable style="width: 220px; margin-left: 8px"
-        @keyup.enter="search" @clear="search" />
-      <el-button style="margin-left: 8px" @click="search">搜索</el-button>
+      <el-input v-model="keyword" placeholder="目标 / 操作人 / 详情" clearable style="width: 220px"
+        :prefix-icon="Search" @keyup.enter="search" @clear="search" />
+      <el-button type="primary" @click="search">查询</el-button>
     </div>
     <el-table :data="logs" v-loading="loading">
       <template #empty><el-empty description="暂无审计记录" :image-size="80" /></template>
@@ -39,6 +39,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { Search } from '@element-plus/icons-vue'
 import TablePagination from '@/components/TablePagination.vue'
 import { fmtDateTime } from '@/utils/format'
 import { auditLogs } from '@/api/audit'
@@ -101,5 +102,5 @@ onMounted(load)
 </script>
 
 <style scoped>
-.toolbar { display: flex; align-items: center; margin-bottom: 12px; }
+.toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
 </style>

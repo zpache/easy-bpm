@@ -16,12 +16,12 @@
               v-model="keyword"
               placeholder="搜索编码 / 名称 / 备注"
               clearable
-              style="width: 240px; margin-right: 12px"
+              style="width: 240px"
               :prefix-icon="Search"
               @keyup.enter="reload"
               @clear="reload"
             />
-            <el-button @click="reload">搜索</el-button>
+            <el-button type="primary" @click="reload">查询</el-button>
             <el-button type="primary" @click="openCreate">新建租户</el-button>
           </div>
         </div>
@@ -624,7 +624,7 @@ onMounted(load)
 
 <style scoped>
 .toolbar { display: flex; align-items: center; justify-content: space-between; }
-.toolbar-right { display: flex; align-items: center; }
+.toolbar-right { display: flex; align-items: center; gap: 8px; }
 .code-cell { font-family: 'SFMono-Regular', Consolas, Menlo, monospace; }
 .switch-alert { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .identity-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }

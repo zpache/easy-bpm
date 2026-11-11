@@ -15,9 +15,7 @@
           @keyup.enter="reload"
           @clear="reload"
         />
-        <el-button @click="reload">
-          <el-icon><Refresh /></el-icon>
-        </el-button>
+        <el-button type="primary" @click="reload">查询</el-button>
       </div>
     </div>
 
@@ -91,7 +89,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TablePagination from '@/components/TablePagination.vue'
 import { ElMessage } from 'element-plus'
-import { Refresh, Search } from '@element-plus/icons-vue'
+import { Search } from '@element-plus/icons-vue'
 import { approveTask, doneTasks, rejectTask, todoTasks } from '@/api/workbench'
 import type { TaskView } from '@/api/types'
 import { actionText, actionType } from '@/utils/labels'

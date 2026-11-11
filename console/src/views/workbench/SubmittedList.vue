@@ -7,8 +7,8 @@
         <el-option label="已驳回" value="REJECTED" />
         <el-option label="已撤回" value="CANCELED" />
       </el-select>
-      <el-input v-model="keyword" placeholder="按标题搜索" clearable style="width: 220px; margin-left: 8px" @keyup.enter="reload" @clear="reload" />
-      <el-button style="margin-left: 8px" @click="reload">搜索</el-button>
+      <el-input v-model="keyword" placeholder="按标题搜索" clearable style="width: 220px" :prefix-icon="Search" @keyup.enter="reload" @clear="reload" />
+      <el-button type="primary" @click="reload">查询</el-button>
     </div>
 
     <el-table :data="instances" v-loading="loading">
@@ -45,6 +45,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Search } from '@element-plus/icons-vue'
 import TablePagination from '@/components/TablePagination.vue'
 import { submittedInstances } from '@/api/workbench'
 import { fmtDateTime } from '@/utils/format'
@@ -89,5 +90,5 @@ onMounted(load)
 </script>
 
 <style scoped>
-.toolbar { display: flex; align-items: center; margin-bottom: 12px; }
+.toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
 </style>
