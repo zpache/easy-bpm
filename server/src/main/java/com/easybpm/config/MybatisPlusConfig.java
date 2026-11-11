@@ -24,7 +24,9 @@ import java.util.Set;
 public class MybatisPlusConfig {
 
     private static final Set<String> IGNORED_TABLES =
-            Set.of("bpm_tenant", "bpm_tenant_credential", "bpm_console_user");
+            Set.of("bpm_tenant", "bpm_tenant_credential", "bpm_console_user",
+                    // SSO 配置与身份绑定：授权回调发生在登录之前，此时没有租户上下文
+                    "bpm_sso_provider", "bpm_sso_identity");
 
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {

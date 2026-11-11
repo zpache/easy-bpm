@@ -37,6 +37,8 @@ public class ConsoleAuthFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         return !path.startsWith("/api/")
                 || path.equals("/api/auth/login")
+                // SSO 授权跳转与回调依赖 IdP state/nonce/PKCE，且发生在登录之前
+                || path.startsWith("/api/auth/sso/")
                 || path.startsWith("/api/public/");
     }
 

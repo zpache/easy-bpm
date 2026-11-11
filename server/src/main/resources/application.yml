@@ -56,6 +56,13 @@ easybpm:
   open:
     # OpenAPI 单机限流（次/分钟，按 AppKey），0 表示关闭
     rate-limit-per-minute: ${EASY_BPM_RATE_LIMIT:600}
+  sso:
+    # 控制台单点登录总开关，关闭后登录页不再探测、授权接口直接拒绝
+    enabled: ${EASY_BPM_SSO_ENABLED:true}
+    # 控制台对外地址，回调成功后跳回这里（经网关/反代时必须配成外部可访问地址）
+    console-base-url: ${EASY_BPM_CONSOLE_BASE_URL:http://localhost:8091}
+    # 默认回调地址，必须与 IdP 侧登记的 redirect_uri 完全一致；租户配置可覆盖
+    default-redirect-uri: ${EASY_BPM_SSO_REDIRECT_URI:http://localhost:8091/api/auth/sso/callback}
 
 springdoc:
   swagger-ui:

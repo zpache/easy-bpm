@@ -38,10 +38,18 @@ export const useAuthStore = defineStore('auth', {
         username,
         password,
       })
+      this.applyLogin(data)
+    },
+    /** 密码登录与 SSO 登录共用：写入本地会话并清空可能残留的平台切换态 */
+    applyLogin(data: LoginResponse) {
       this.token = data.token
       this.user = { username: data.username, name: data.user?.displayName, role: data.user?.role }
+      this.switchedTenant = null
       localStorage.setItem(TOKEN_KEY, data.token)
       localStorage.setItem(USER_KEY, JSON.stringify(this.user))
+      localStorage.removeItem(PLATFORM_TOKEN_KEY)
+      localStorage.removeItem(PLATFORM_USER_KEY)
+      localStorage.removeItem(SWITCHED_TENANT_KEY)
     },
     /** 平台管理员切换进入某租户：保存平台会话，启用目标租户 token */
     enterTenant(payload: PlatformTenantSwitch) {

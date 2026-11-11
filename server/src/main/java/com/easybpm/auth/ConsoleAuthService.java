@@ -33,6 +33,10 @@ public class ConsoleAuthService {
                 .eq(ConsoleUser::getUsername, username));
 
         if (user == null || !passwordService.matches(password, user.getPasswordHash())) {
+            // SSO 专属账号没有密码散列，直接提示走企业登录，避免用户反复试密码
+            if (user != null && user.getPasswordHash() == null) {
+                throw new BizException(ErrorCode.UNAUTHORIZED, "该账号已启用企业单点登录，请点击「企业登录」");
+            }
             throw new BizException(ErrorCode.UNAUTHORIZED, "租户编码、账号或密码不正确");
         }
         if (!"ACTIVE".equals(user.getStatus())) {
