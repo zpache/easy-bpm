@@ -4,9 +4,16 @@
       <el-button @click="router.push({ name: 'flows' })">返回</el-button>
       <span class="flow-title">{{ flow?.name }}（{{ code }}）· 审批流程设计</span>
       <span style="flex: 1" />
-      <el-button v-if="auth.isTenantAdmin" :disabled="flow?.status === 'DISABLED'" @click="addApprovalNode">+ 审批节点</el-button>
-      <el-button v-if="auth.isTenantAdmin" :disabled="flow?.status === 'DISABLED'" @click="addCcNode">+ 抄送节点</el-button>
-      <el-button v-if="auth.isTenantAdmin" :disabled="flow?.status === 'DISABLED'" @click="addGatewayNode">+ 条件分支</el-button>
+      <el-dropdown v-if="auth.isTenantAdmin" :disabled="flow?.status === 'DISABLED'" @command="addNodeAtEnd">
+        <el-button type="primary" plain :disabled="flow?.status === 'DISABLED'">+ 添加节点<el-icon style="margin-left: 4px"><arrow-down /></el-icon></el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="APPROVAL">审批节点<span class="node-desc">需要某人处理</span></el-dropdown-item>
+            <el-dropdown-item command="CC">抄送节点<span class="node-desc">知会某人</span></el-dropdown-item>
+            <el-dropdown-item command="CONDITION">条件分支<span class="node-desc">按业务数据选路</span></el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <el-button v-if="auth.isTenantAdmin" :disabled="flow?.status === 'DISABLED'" @click="onSave">保存草稿</el-button>
       <el-button v-if="auth.isTenantAdmin" type="success" :disabled="flow?.status === 'DISABLED'" :loading="publishing" @click="onPublish">发布</el-button>
     </div>
@@ -72,7 +79,16 @@
         <div v-if="node.type !== 'END'" class="connector">
           <template v-if="canInsertAfter(index)">
             <span class="seg"></span>
-            <el-button circle size="small" class="insert-btn" @click.stop="insertAfter(index)">＋</el-button>
+            <el-dropdown trigger="click" @command="(t: 'APPROVAL' | 'CC' | 'CONDITION') => insertAfter(index, t)">
+              <el-button circle size="small" class="insert-btn">＋</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="APPROVAL">审批节点</el-dropdown-item>
+                  <el-dropdown-item command="CC">抄送节点</el-dropdown-item>
+                  <el-dropdown-item command="CONDITION">条件分支</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
             <span class="seg short"></span>
             <span class="head"></span>
           </template>
@@ -255,6 +271,7 @@ import type { FlowFormField } from '@/api/flows'
 import { orgRoles, orgUsers } from '@/api/org'
 import { useAuthStore } from '@/stores/auth'
 import type { OrgRoleView, OrgUserView } from '@/api/types'
+import { ArrowDown } from '@element-plus/icons-vue'
 
 interface NodeProps {
   approverType?: string
@@ -415,44 +432,33 @@ function canInsertAfter(index: number): boolean {
   return node.type !== 'START' && node.type !== 'END' && next && next.type === 'END'
 }
 
-function insertAfter(index: number, type: 'APPROVAL' | 'CC' = 'APPROVAL') {
-  const node: FlowNode & { props: NodeProps } = type === 'CC'
-    ? { id: 'c' + Date.now().toString(36), type: 'CC', name: '抄送', props: { ccUsers: '' } }
-    : {
-        id: 'n' + Date.now().toString(36),
-        type: 'APPROVAL',
-        name: '新审批节点',
-        props: { approverType: 'INITIATOR_LEADER', leaderLevel: 1, mode: 'ANY', rejectStrategy: 'TO_END' },
-      }
+function insertAfter(index: number, type: 'APPROVAL' | 'CC' | 'CONDITION' = 'APPROVAL') {
+  let node: FlowNode
+  if (type === 'CC') {
+    node = { id: 'c' + Date.now().toString(36), type: 'CC', name: '抄送', props: { ccUsers: '' } }
+  } else if (type === 'CONDITION') {
+    node = newGateway()
+  } else {
+    node = {
+      id: 'n' + Date.now().toString(36),
+      type: 'APPROVAL',
+      name: '新审批节点',
+      props: { approverType: 'INITIATOR_LEADER', leaderLevel: 1, mode: 'ANY', rejectStrategy: 'TO_END' },
+    }
+  }
   nodes.value.splice(index + 1, 0, node)
   selectedIndex.value = index + 1
-  editing.value = node
-  isNewNode.value = true
-  drawerVisible.value = true
-}
-
-function addApprovalNode() {
-  const endIndex = nodes.value.findIndex((n) => n.type === 'END')
-  if (endIndex > 0) insertAfter(endIndex - 1, 'APPROVAL')
-}
-
-function addCcNode() {
-  const endIndex = nodes.value.findIndex((n) => n.type === 'END')
-  if (endIndex > 0) insertAfter(endIndex - 1, 'CC')
-}
-
-function newApproval(name = '新审批节点'): FlowNode {
-  return {
-    id: 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-    type: 'APPROVAL', name,
-    props: { approverType: 'INITIATOR_LEADER', leaderLevel: 1, mode: 'ANY', rejectStrategy: 'TO_END' },
+  if (type === 'CONDITION') {
+    openGatewayEdit(index + 1)
+  } else {
+    editing.value = node as FlowNode & { props: NodeProps }
+    isNewNode.value = true
+    drawerVisible.value = true
   }
 }
 
-function addGatewayNode() {
-  const endIndex = nodes.value.findIndex((n) => n.type === 'END')
-  if (endIndex <= 0) return
-  const gateway: FlowNode = {
+function newGateway(): FlowNode {
+  return {
     id: 'g' + Date.now().toString(36),
     type: 'CONDITION',
     name: '条件分支',
@@ -461,8 +467,20 @@ function addGatewayNode() {
       { name: '默认分支', condition: '', nodes: [newApproval('默认审批')] },
     ],
   }
-  nodes.value.splice(endIndex, 0, gateway)
-  openGatewayEdit(endIndex)
+}
+
+function addNodeAtEnd(type: 'APPROVAL' | 'CC' | 'CONDITION') {
+  const endIndex = nodes.value.findIndex((n) => n.type === 'END')
+  if (endIndex <= 0) return
+  insertAfter(endIndex - 1, type)
+}
+
+function newApproval(name = '新审批节点'): FlowNode {
+  return {
+    id: 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+    type: 'APPROVAL', name,
+    props: { approverType: 'INITIATOR_LEADER', leaderLevel: 1, mode: 'ANY', rejectStrategy: 'TO_END' },
+  }
 }
 
 function addBranchNode(gw: number, branch: number, type: 'APPROVAL' | 'CC') {
@@ -867,6 +885,7 @@ onMounted(async () => {
 .connector .head { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #c8ccd4; }
 .connector .insert-btn { margin: 0; font-weight: 600; color: #0960bd; border-color: #bcd4ee; }
 .connector .insert-btn:hover { background: #ecf3fb; }
+.node-desc { float: right; margin-left: 24px; font-size: 12px; color: #909399; }
 .field-hint { font-size: 12px; color: #909399; line-height: 1.5; margin-top: 4px; }
 
 .node.gateway { background: #f6f2ff; border: 1.5px solid #a8a2e8; }
