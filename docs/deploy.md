@@ -160,5 +160,5 @@ docker exec -i easy-bpm-mysql mysql -uroot -p$EASY_BPM_DB_PASSWORD easy_bpm < db
 ## 5. 非容器部署
 
 1. `mvn -DskipTests package` 得到 `easy-bpm-server/target/easy-bpm-server.jar`；
-2. `java -jar easy-bpm-server.jar --spring.profiles.active=prod`，数据库连接用环境变量注入（见 `application-prod.yml`）；
+2. `java -jar easy-bpm-server.jar --spring.profiles.active=prod`，数据库连接已明文内置在 `application-prod.yml`（腾讯云 MySQL `REDACTED@easy_bpm`）；如需覆盖，仍可通过 `EASY_BPM_DB_*` 环境变量注入；
 3. 前端 `cd console && pnpm build`，把 `dist/` 交给任意静态服务器，并将 `/api` 反代到 8090（参考 `console/nginx.conf`）。

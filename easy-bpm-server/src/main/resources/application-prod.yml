@@ -1,8 +1,9 @@
 spring:
   datasource:
-    url: ${EASY_BPM_DB_URL}
-    username: ${EASY_BPM_DB_USERNAME}
-    password: ${EASY_BPM_DB_PASSWORD}
+    # 生产库：腾讯云 MySQL（REDACTED@easy_bpm），明文配置（仓库私有，密码变更需同步此处）
+    url: jdbc:mysql://REDACTED_HOST/easy_bpm?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false&rewriteBatchedStatements=true
+    username: REDACTED
+    password: REDACTED
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 20
