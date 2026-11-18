@@ -1,5 +1,5 @@
 # Java
-server/target/
+easy-bpm-server/target/
 *.class
 *.jar
 *.original
