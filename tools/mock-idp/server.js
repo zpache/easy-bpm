@@ -34,7 +34,7 @@ const provider = new Provider(ISSUER, {
       response_types: ['code'],
       redirect_uris: [
         'http://localhost:8091/api/auth/sso/callback',
-        'http://localhost:8090/api/auth/sso/callback',
+        'http://localhost:8082/api/auth/sso/callback',
       ],
       post_logout_redirect_uris: [],
     },

@@ -3,7 +3,7 @@
 easy-bpm 审批中台的 Java 客户端：签名鉴权 + 审批闭环 + 增量轮询。
 
 ```java
-EasyBpmClient client = EasyBpmClient.create("http://localhost:8090", "ak_demo", "sk_demo_2026");
+EasyBpmClient client = EasyBpmClient.create("http://localhost:8082", "ak_demo", "sk_demo_2026");
 client.start(StartRequest.builder().flowCode("leave").initiator("u1001", "张三")
         .businessKey("LEAVE-001").formData(Map.of("days", 3)).build());
 ```

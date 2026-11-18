@@ -85,10 +85,10 @@ java -jar target/easy-bpm-server.jar --spring.profiles.active=local
 
 启动后：
 
-- 服务地址：`http://localhost:8090`
-- Swagger UI：`http://localhost:8090/swagger-ui.html`
-- 健康检查：`http://localhost:8090/actuator/health`
-- 控制台前端（可选）：`cd console && pnpm install && pnpm dev`，访问 `http://localhost:8091`（开发代理已指向 8090）
+- 服务地址：`http://localhost:8082`
+- Swagger UI：`http://localhost:8082/swagger-ui.html`
+- 健康检查：`http://localhost:8082/actuator/health`
+- 控制台前端（可选）：`cd console && pnpm install && pnpm dev`，访问 `http://localhost:8091`（开发代理已指向 8082）
 
 首次启动会自动建业务表、Flowable 引擎表，并写入演示数据（`easybpm.demo.enabled=true`）：
 

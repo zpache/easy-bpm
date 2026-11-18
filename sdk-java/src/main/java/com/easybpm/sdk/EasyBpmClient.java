@@ -46,7 +46,7 @@ import java.util.Map;
  *
  * <pre>{@code
  * EasyBpmClient client = EasyBpmClient.builder()
- *         .baseUrl("http://localhost:8090")
+ *         .baseUrl("http://localhost:8082")
  *         .appKey("ak_demo")
  *         .appSecret("sk_demo_2026")
  *         .build();

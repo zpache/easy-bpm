@@ -1,6 +1,6 @@
 # 控制台使用手册
 
-控制台是 easy-bpm 的管理与操作界面（Vue 3 + TypeScript + Element Plus），前端位于 `console/`，默认 `http://localhost:8091`，开发代理指向后端 `8090`。
+控制台是 easy-bpm 的管理与操作界面（Vue 3 + TypeScript + Element Plus），前端位于 `console/`，默认 `http://localhost:8091`，开发代理指向后端 `8082`。
 
 - 面向对象：业务方管理员（配置流程、维护组织、查看统计）与审批参与人（处理待办、查看抄送）。
 - 业务系统内的最终用户**不需要**登录本控制台，他们的动作走 OpenAPI；控制台是"配置 + 运营"视角。

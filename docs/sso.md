@@ -137,21 +137,21 @@ JWT 不进 URL：回调只带一次性 ticket，前端换到 token 后与密码�
 
 ### 8.1 Level 0：无 IdP 冒烟（只验服务端骨架与防伪逻辑）
 
-服务启动后（默认 `http://localhost:8090`）：
+服务启动后（默认 `http://localhost:8082`）：
 
 ```bash
 # 1. 未配置 IdP：返回空数组
-curl -s 'http://localhost:8090/api/auth/sso/providers?tenantCode=demo'
+curl -s 'http://localhost:8082/api/auth/sso/providers?tenantCode=demo'
 
 # 2. 配置一个假 IdP 后（Issuer 随便填），providers 应返回 [{code:"default",name:...}]
 # 3. 授权跳转：issuer 的 discovery 不可达时会返回 JSON 错误而非 302
-curl -s -o /dev/null -w '%{http_code}' 'http://localhost:8090/api/auth/sso/authorize?tenantCode=demo'
+curl -s -o /dev/null -w '%{http_code}' 'http://localhost:8082/api/auth/sso/authorize?tenantCode=demo'
 
 # 4. 伪造 state 回调 → 302 到 /sso/callback?error=STATE_INVALID
-curl -s -o /dev/null -w '%{redirect_url}' 'http://localhost:8090/api/auth/sso/callback?code=x&state=fake'
+curl -s -o /dev/null -w '%{redirect_url}' 'http://localhost:8082/api/auth/sso/callback?code=x&state=fake'
 
 # 5. 伪造 ticket 换登录态 → 明确报「登录凭证已失效」
-curl -s -X POST 'http://localhost:8090/api/auth/sso/exchange' \
+curl -s -X POST 'http://localhost:8082/api/auth/sso/exchange' \
   -H 'Content-Type: application/json' -d '{"ticket":"fake"}'
 ```
 

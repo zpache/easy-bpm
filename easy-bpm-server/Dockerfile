@@ -13,6 +13,6 @@ COPY easy-bpm-server/target/easy-bpm-server.jar app.jar
 ENV TZ=Asia/Shanghai \
     JAVA_OPTS=""
 
-EXPOSE 8090
+EXPOSE 8082
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

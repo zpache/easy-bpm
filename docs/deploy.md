@@ -5,7 +5,7 @@
 ```
 ┌─────────────┐      ┌──────────────────┐      ┌────────────┐
 │ 控制台 nginx │ ───▶ │ easy-bpm-server  │ ───▶ │ MySQL 8.4  │
-│ (静态+反代)  │ /api │  :8090           │      │ 业务表+ACT_ │
+│ (静态+反代)  │ /api │  :8082           │      │ 业务表+ACT_ │
 └─────────────┘      └──────────────────┘      └────────────┘
        ▲                    ▲
        │ 登录/工作台         │ OpenAPI（AppKey 签名 + 限流）
@@ -39,8 +39,8 @@ docker compose up -d --build
 | 入口 | 地址 |
 |---|---|
 | 控制台 | `http://<主机>/` |
-| 服务端 / OpenAPI | `http://<主机>:8090/open/v1/...` |
-| 健康检查 | `http://<主机>:8090/actuator/health` |
+| 服务端 / OpenAPI | `http://<主机>:8082/open/v1/...` |
+| 健康检查 | `http://<主机>:8082/actuator/health` |
 
 首次启动 mysql 容器会自动执行 `db/mysql/schema.sql` 建业务表；Flowable 引擎表由服务端首次启动创建（prod profile 下 `flowable.database-schema-update=false`，因此**首次启动前需临时放开一次**，见下文 4.3）。
 
@@ -161,4 +161,4 @@ docker exec -i easy-bpm-mysql mysql -uroot -p$EASY_BPM_DB_PASSWORD easy_bpm < db
 
 1. `mvn -DskipTests package` 得到 `easy-bpm-server/target/easy-bpm-server.jar`；
 2. `java -jar easy-bpm-server.jar --spring.profiles.active=prod`，数据库连接已明文内置在 `application-prod.yml`（腾讯云 MySQL `REDACTED@easy_bpm`）；如需覆盖，仍可通过 `EASY_BPM_DB_*` 环境变量注入；
-3. 前端 `cd console && pnpm build`，把 `dist/` 交给任意静态服务器，并将 `/api` 反代到 8090（参考 `console/nginx.conf`）。
+3. 前端 `cd console && pnpm build`，把 `dist/` 交给任意静态服务器，并将 `/api` 反代到 8082（参考 `console/nginx.conf`）。
