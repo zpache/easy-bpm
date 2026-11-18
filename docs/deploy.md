@@ -22,7 +22,7 @@
 
 ```bash
 # 1. 构建后端 jar
-cd server && JAVA_HOME=<corretto-25 路径> mvn -DskipTests package && cd ..
+cd easy-bpm-server && JAVA_HOME=<corretto-25 路径> mvn -DskipTests package && cd ..
 
 # 2. 准备环境变量（推荐写入同目录 .env，权限 600）
 cat > .env <<'EOF'
@@ -136,7 +136,7 @@ docker exec -i easy-bpm-mysql mysql -uroot -p$EASY_BPM_DB_PASSWORD easy_bpm < db
 
 1. 备份：`docker exec easy-bpm-mysql mysqldump -uroot -p$EASY_BPM_DB_PASSWORD easy_bpm > backup.sql`
 2. 执行 `db/migrations/` 下未应用的升级脚本；
-3. 重新构建并滚动重启：`docker compose up -d --build server`。
+3. 重新构建并滚动重启：`docker compose up -d --build easy-bpm-server`。
 
 ### 4.3 Flowable 引擎表
 
@@ -159,6 +159,6 @@ docker exec -i easy-bpm-mysql mysql -uroot -p$EASY_BPM_DB_PASSWORD easy_bpm < db
 
 ## 5. 非容器部署
 
-1. `mvn -DskipTests package` 得到 `server/target/easy-bpm-server-1.0.0.jar`；
-2. `java -jar easy-bpm-server-1.0.0.jar --spring.profiles.active=prod`，数据库连接用环境变量注入（见 `application-prod.yml`）；
+1. `mvn -DskipTests package` 得到 `easy-bpm-server/target/easy-bpm-server.jar`；
+2. `java -jar easy-bpm-server.jar --spring.profiles.active=prod`，数据库连接用环境变量注入（见 `application-prod.yml`）；
 3. 前端 `cd console && pnpm build`，把 `dist/` 交给任意静态服务器，并将 `/api` 反代到 8090（参考 `console/nginx.conf`）。

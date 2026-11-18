@@ -1,7 +1,7 @@
 # easy-bpm 一键部署：MySQL 8.4 + 服务端 + 控制台
 #
 # 前置（宿主机一次性执行）：
-#   1. 构建后端 jar：cd server && JAVA_HOME=<corretto-25> mvn -DskipTests package
+#   1. 构建后端 jar：cd easy-bpm-server && JAVA_HOME=<corretto-25> mvn -DskipTests package
 #   2. 生产库结构由 db/mysql/schema.sql 初始化（mysql 容器首次启动自动执行）
 #
 # 启动：docker compose up -d --build
@@ -26,10 +26,10 @@ services:
       retries: 10
     restart: unless-stopped
 
-  server:
+  easy-bpm-server:
     build:
       context: .
-      dockerfile: server/Dockerfile
+      dockerfile: easy-bpm-server/Dockerfile
     container_name: easy-bpm-server
     environment:
       SPRING_PROFILES_ACTIVE: prod
@@ -53,7 +53,7 @@ services:
       dockerfile: console/Dockerfile
     container_name: easy-bpm-console
     depends_on:
-      - server
+      - easy-bpm-server
     ports:
       - "80:80"
     restart: unless-stopped

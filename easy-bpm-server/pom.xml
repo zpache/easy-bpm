@@ -110,6 +110,8 @@
     </dependencies>
 
     <build>
+        <!-- 固定打包产物名：easy-bpm-server.jar（不带版本号） -->
+        <finalName>easy-bpm-server</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

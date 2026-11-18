@@ -35,7 +35,7 @@ easy-bpm 的做法：
 
 ```
 easy-bpm/
-├─ server/                       # Spring Boot 服务
+├─ easy-bpm-server/                       # Spring Boot 服务
 │  ├─ src/main/java/com/easybpm/
 │  │  ├─ auth/                   # 控制台登录、OpenAPI 鉴权过滤器
 │  │  │  └─ sso/                 # 控制台 OIDC 单点登录（配置、授权、绑定）
@@ -70,8 +70,8 @@ mysql -uroot -p -e "CREATE DATABASE IF NOT EXISTS easy_bpm DEFAULT CHARSET utf8m
 
 # 2. 本地启动（推荐）：使用 local 配置（不入库）
 #    先复制模板并填入本机数据库密码：
-cp server/src/main/resources/application-local.yml.example server/src/main/resources/application-local.yml
-cd server
+cp easy-bpm-server/src/main/resources/application-local.yml.example easy-bpm-server/src/main/resources/application-local.yml
+cd easy-bpm-server
 mvn spring-boot:run -Dspring-boot.run.profiles=local
 
 # 或使用 dev 配置（数据库密码通过环境变量提供）
@@ -80,7 +80,7 @@ mvn spring-boot:run
 
 # 打包运行
 mvn -DskipTests package
-java -jar target/easy-bpm-server-1.0.0.jar --spring.profiles.active=local
+java -jar target/easy-bpm-server.jar --spring.profiles.active=local
 ```
 
 启动后：
@@ -311,11 +311,11 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 ## 测试
 
 ```bash
-cd server && mvn test
+cd easy-bpm-server && mvn test
 ```
 
 - 集成测试使用 H2 内存库（原生模式，Flowable 自动建 `ACT_*` 表）+ 真实引擎，无需外部依赖；
-- 测试 DDL 见 `server/src/test/resources/db/schema-h2.sql`，配置见 `application-test.yml`；
+- 测试 DDL 见 `easy-bpm-server/src/test/resources/db/schema-h2.sql`，配置见 `application-test.yml`；
 - 覆盖：发起→同意、驳回 TO_END、驳回 TO_START→重提（ID 恒定）、撤回、幂等键、租户隔离、抄送闭环与越权、审批人为空 AUTO_PASS 兜底；
 - 每个用例使用独立租户，互不污染。
 
