@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import type { ApiResponse } from './types'
 import { router } from '@/router'
 
-const http = axios.create({ baseURL: '/', timeout: 15000 })
+const http = axios.create({ baseURL: import.meta.env.VITE_API_BASE || '/', timeout: 15000 })
 
 http.interceptors.request.use((config) => {
   const auth = useAuthStore()
