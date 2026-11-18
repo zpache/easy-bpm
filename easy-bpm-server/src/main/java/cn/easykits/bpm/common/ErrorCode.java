@@ -14,6 +14,7 @@ public enum ErrorCode {
     SIGNATURE_INVALID(40101, HttpStatus.UNAUTHORIZED, "签名校验失败"),
     FORBIDDEN(40300, HttpStatus.FORBIDDEN, "无权访问该资源"),
     NOT_FOUND(40400, HttpStatus.NOT_FOUND, "资源不存在"),
+    METHOD_NOT_ALLOWED(40500, HttpStatus.METHOD_NOT_ALLOWED, "请求方法不支持"),
     CONFLICT(40900, HttpStatus.CONFLICT, "资源状态冲突"),
     TENANT_DISABLED(40301, HttpStatus.FORBIDDEN, "租户已停用"),
 

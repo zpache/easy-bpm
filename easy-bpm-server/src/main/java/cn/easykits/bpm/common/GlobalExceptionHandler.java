@@ -11,7 +11,9 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
@@ -59,6 +61,21 @@ public class GlobalExceptionHandler {
         log.error("流程引擎异常", e);
         return ResponseEntity.status(ErrorCode.CONFLICT.httpStatus())
                 .body(ApiResponse.fail(ErrorCode.CONFLICT, "流程引擎处理失败：" + rootMessage(e)));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResource(NoResourceFoundException e) {
+        // 未匹配到任何 API 路径（如扫端口、误配反代路径）。属普通 404，不值得 ERROR + 全栈。
+        log.warn("404 未匹配路径: {}", e.getResourcePath());
+        return ResponseEntity.status(ErrorCode.NOT_FOUND.httpStatus())
+                .body(ApiResponse.fail(ErrorCode.NOT_FOUND, "接口不存在"));
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+        log.warn("405 方法不支持: {}", e.getMessage());
+        return ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.httpStatus())
+                .body(ApiResponse.fail(ErrorCode.METHOD_NOT_ALLOWED, "请求方法不支持"));
     }
 
     @ExceptionHandler(Exception.class)
