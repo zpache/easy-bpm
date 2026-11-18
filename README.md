@@ -36,7 +36,7 @@ easy-bpm 的做法：
 ```
 easy-bpm/
 ├─ easy-bpm-server/                       # Spring Boot 服务
-│  ├─ src/main/java/com/easybpm/
+│  ├─ src/main/java/cn/easykits/bpm/
 │  │  ├─ auth/                   # 控制台登录、OpenAPI 鉴权过滤器
 │  │  │  └─ sso/                 # 控制台 OIDC 单点登录（配置、授权、绑定）
 │  │  ├─ tenant/                 # 租户上下文、租户与凭证
@@ -272,7 +272,7 @@ OpenAPI（`/open/v1`，AppKey 鉴权）：
 
 ### 11. Java SDK
 
-- `sdk-java/` 是独立 Maven 模块（`com.easybpm:easy-bpm-sdk`，Java 17+），只依赖 Jackson，HTTP 走 JDK `HttpClient`；
+- `sdk-java/` 是独立 Maven 模块（`cn.easykits.bpm:easy-bpm-sdk`，Java 17+），只依赖 Jackson，HTTP 走 JDK `HttpClient`；
 - 封装签名鉴权（查询串参与签名）、全部 OpenAPI、GET 自动重试与 429 退避、`EasyBpmException`（含 code/traceId）；
 - `ChangePoller` 一条链把游标推进、`hasMore` 续拉、`eventId` 去重、失败退避都做完，等于「没有 Webhook 的实时待办」；
 - 用法见 `docs/sdk-java.md`，方法对照表覆盖 `docs/integration.md` 的全部接口。

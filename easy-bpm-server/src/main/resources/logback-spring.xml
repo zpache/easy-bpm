@@ -80,7 +80,7 @@
 
     <!-- 开发环境：控制台 + 文件，业务代码 debug -->
     <springProfile name="dev">
-        <logger name="com.easybpm" level="DEBUG"/>
+        <logger name="cn.easykits.bpm" level="DEBUG"/>
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="ASYNC_FILE"/>
@@ -90,7 +90,7 @@
 
     <!-- 生产环境：仅文件（异步），控制台只留启动期输出 -->
     <springProfile name="prod">
-        <logger name="com.easybpm" level="INFO"/>
+        <logger name="cn.easykits.bpm" level="INFO"/>
         <root level="INFO">
             <appender-ref ref="ASYNC_FILE"/>
             <appender-ref ref="ASYNC_ERROR_FILE"/>
@@ -99,7 +99,7 @@
 
     <!-- 兜底：未匹配任何 profile 时，等同 dev -->
     <springProfile name="!(dev | prod)">
-        <logger name="com.easybpm" level="DEBUG"/>
+        <logger name="cn.easykits.bpm" level="DEBUG"/>
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="ASYNC_FILE"/>

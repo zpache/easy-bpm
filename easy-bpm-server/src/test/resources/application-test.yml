@@ -30,4 +30,4 @@ easybpm:
 logging:
   level:
     root: WARN
-    com.easybpm: INFO
+    cn.easykits.bpm: INFO

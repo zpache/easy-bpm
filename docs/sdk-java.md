@@ -2,7 +2,7 @@
 
 面向 Java 接入方的最小客户端：**只依赖 Jackson + JDK HttpClient**，不含 Web 框架，可直接放进 Spring Boot / 传统 SSM / 定时任务工程。
 
-- 源码：`sdk-java/`（Maven 模块，`com.easybpm:easy-bpm-sdk:1.0.0`，Java 17+）
+- 源码：`sdk-java/`（Maven 模块，`cn.easykits.bpm:easy-bpm-sdk:1.0.0`，Java 17+）
 - 覆盖 OpenAPI 全量接口：发起、同意/驳回/转交、撤回、重提、待办/已办/抄送、工作台快照、增量轮询、组织同步
 - 内置签名鉴权、GET 自动重试、429 退避、统一异常（`code` / `traceId` / `httpStatus`）
 
@@ -18,7 +18,7 @@ mvn -f sdk-java/pom.xml install
 
 ```xml
 <dependency>
-    <groupId>com.easybpm</groupId>
+    <groupId>cn.easykits.bpm</groupId>
     <artifactId>easy-bpm-sdk</artifactId>
     <version>1.0.0</version>
 </dependency>

@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.easybpm</groupId>
+    <groupId>cn.easykits.bpm</groupId>
     <artifactId>easy-bpm-server</artifactId>
     <version>1.0.0</version>
     <name>easy-bpm-server</name>
