@@ -7,6 +7,7 @@ easy-bpm-server/target/
 # Node
 console/node_modules/
 console/dist/
+console/dist.zip
 
 # IDE
 .idea/
