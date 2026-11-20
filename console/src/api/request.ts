@@ -6,7 +6,14 @@ import { router } from '@/router'
 
 const http = axios.create({ baseURL: import.meta.env.VITE_API_BASE || '/', timeout: 15000 })
 
+// 产线通过独立 API 域名（VITE_API_BASE）访问时，请求不再携带 /api 前缀，
+// 由产线网关/nginx 负责路由；开发环境未配置 VITE_API_BASE，走 vite 代理保留 /api。
+const PROD_API_BASE = import.meta.env.VITE_API_BASE
+
 http.interceptors.request.use((config) => {
+  if (PROD_API_BASE && config.url?.startsWith('/api/')) {
+    config.url = config.url.slice('/api'.length)
+  }
   const auth = useAuthStore()
   if (auth.token) {
     config.headers.Authorization = `Bearer ${auth.token}`
