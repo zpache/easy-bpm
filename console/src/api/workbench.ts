@@ -19,46 +19,46 @@ function toQuery(params: PageParams) {
 }
 
 export function todoTasks(params: PageParams) {
-  return http.get<never, PageResult<TaskView>>('/api/workbench/todo', { params: toQuery(params) })
+  return http.get<never, PageResult<TaskView>>('/workbench/todo', { params: toQuery(params) })
 }
 
 export function doneTasks(params: PageParams) {
-  return http.get<never, PageResult<TaskView>>('/api/workbench/done', { params: toQuery(params) })
+  return http.get<never, PageResult<TaskView>>('/workbench/done', { params: toQuery(params) })
 }
 
 export function submittedInstances(params: PageParams) {
-  return http.get<never, PageResult<InstanceView>>('/api/workbench/submitted', { params: toQuery(params) })
+  return http.get<never, PageResult<InstanceView>>('/workbench/submitted', { params: toQuery(params) })
 }
 
 export function workbenchCounts() {
-  return http.get<never, WorkbenchCounts>('/api/workbench/counts')
+  return http.get<never, WorkbenchCounts>('/workbench/counts')
 }
 
 export function ccList(params: PageParams) {
   const query: Record<string, string | number | boolean> = { page: params.page ?? 1, size: params.size ?? 10 }
   if (params.keyword) query.keyword = params.keyword
   if (params.unreadOnly) query.unreadOnly = true
-  return http.get<never, PageResult<CcView>>('/api/workbench/cc', { params: query })
+  return http.get<never, PageResult<CcView>>('/workbench/cc', { params: query })
 }
 
 export function markCcRead(id: string) {
-  return http.post<never, void>(`/api/workbench/cc/${id}/read`)
+  return http.post<never, void>(`/workbench/cc/${id}/read`)
 }
 
 export function instanceDetail(instanceId: string) {
-  return http.get<never, InstanceDetail>(`/api/workbench/instances/${instanceId}`)
+  return http.get<never, InstanceDetail>(`/workbench/instances/${instanceId}`)
 }
 
 export function approveTask(taskId: string, comment: string) {
-  return http.post<never, unknown>(`/api/workbench/tasks/${taskId}/approve`, { comment })
+  return http.post<never, unknown>(`/workbench/tasks/${taskId}/approve`, { comment })
 }
 
 export function rejectTask(taskId: string, comment: string) {
-  return http.post<never, unknown>(`/api/workbench/tasks/${taskId}/reject`, { comment })
+  return http.post<never, unknown>(`/workbench/tasks/${taskId}/reject`, { comment })
 }
 
 export function dashboardSummary() {
-  return http.get<never, Record<string, number>>('/api/dashboard/summary')
+  return http.get<never, Record<string, number>>('/dashboard/summary')
 }
 
 export interface DashboardTrendPoint {
@@ -81,13 +81,13 @@ export interface DashboardStats {
 }
 
 export function dashboardStats() {
-  return http.get<never, DashboardStats>('/api/dashboard/stats')
+  return http.get<never, DashboardStats>('/dashboard/stats')
 }
 
 export function allInstances(params: PageParams) {
-  return http.get<never, PageResult<InstanceView>>('/api/instances', { params: toQuery(params) })
+  return http.get<never, PageResult<InstanceView>>('/instances', { params: toQuery(params) })
 }
 
 export function forceTransferTask(instanceId: string, taskId: string, targetUserCode: string, comment?: string) {
-  return http.post<never, unknown>(`/api/instances/${instanceId}/force-transfer`, { taskId, targetUserCode, comment })
+  return http.post<never, unknown>(`/instances/${instanceId}/force-transfer`, { taskId, targetUserCode, comment })
 }

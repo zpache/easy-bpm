@@ -45,8 +45,40 @@ export default defineConfig({
   server: {
     port: 8091,
     proxy: {
-      '/api': { target: 'http://127.0.0.1:8082', changeOrigin: true },
+      // 控制台接口无前缀，按前缀代理到 8082。
+      // /flows、/workbench 等与 SPA 页面路由重名：浏览器整页导航（Accept: text/html）回退到 SPA，
+      // XHR（Accept: application/json）走代理；/auth/sso/authorize 是登录整页跳转，不 bypass。
+      '/auth': { target: 'http://127.0.0.1:8082', changeOrigin: true },
+      '/org': { target: 'http://127.0.0.1:8082', changeOrigin: true },
+      '/tenant': { target: 'http://127.0.0.1:8082', changeOrigin: true },
+      '/audit': { target: 'http://127.0.0.1:8082', changeOrigin: true },
       '/open': { target: 'http://127.0.0.1:8082', changeOrigin: true },
+      '/public': { target: 'http://127.0.0.1:8082', changeOrigin: true },
+      '/flows': {
+        target: 'http://127.0.0.1:8082',
+        changeOrigin: true,
+        bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
+      },
+      '/workbench': {
+        target: 'http://127.0.0.1:8082',
+        changeOrigin: true,
+        bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
+      },
+      '/instances': {
+        target: 'http://127.0.0.1:8082',
+        changeOrigin: true,
+        bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
+      },
+      '/platform': {
+        target: 'http://127.0.0.1:8082',
+        changeOrigin: true,
+        bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
+      },
+      '/dashboard': {
+        target: 'http://127.0.0.1:8082',
+        changeOrigin: true,
+        bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
+      },
     },
   },
 })

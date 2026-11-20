@@ -20,7 +20,7 @@ async function open(method, path, body) {
 }
 
 async function api(method, path, body, token) {
-  const res = await fetch(`${API}/api${path}`, {
+  const res = await fetch(``, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -34,7 +34,7 @@ async function api(method, path, body, token) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 async function login(username, tenantCode = 'demo') {
-  const res = await fetch(`${API}/api/auth/login`, {
+  const res = await fetch(`/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tenantCode, username, password: 'admin123' }),

@@ -7,7 +7,7 @@ export interface SsoProviderBrief {
 }
 
 export function listSsoProviders(tenantCode: string) {
-  return http.get<never, SsoProviderBrief[]>('/api/auth/sso/providers', { params: { tenantCode } })
+  return http.get<never, SsoProviderBrief[]>('/auth/sso/providers', { params: { tenantCode } })
 }
 
 export interface SsoLoginUser {
@@ -26,7 +26,7 @@ export interface SsoLoginResult {
 }
 
 export function exchangeSsoTicket(ticket: string) {
-  return http.post<never, SsoLoginResult>('/api/auth/sso/exchange', { ticket })
+  return http.post<never, SsoLoginResult>('/auth/sso/exchange', { ticket })
 }
 
 export interface SsoConfig {
@@ -61,11 +61,11 @@ export interface SsoConfigPayload {
 }
 
 export function getSsoConfig(tenantId: string) {
-  return http.get<never, SsoConfig>(`/api/platform/tenants/${tenantId}/sso`)
+  return http.get<never, SsoConfig>(`/platform/tenants/${tenantId}/sso`)
 }
 
 export function saveSsoConfig(tenantId: string, payload: SsoConfigPayload) {
-  return http.post<never, SsoConfig>(`/api/platform/tenants/${tenantId}/sso`, payload)
+  return http.post<never, SsoConfig>(`/platform/tenants/${tenantId}/sso`, payload)
 }
 
 export interface SsoTestResult {
@@ -79,7 +79,7 @@ export interface SsoTestResult {
 }
 
 export function testSsoConnection(tenantId: string, issuer: string) {
-  return http.post<never, SsoTestResult>(`/api/platform/tenants/${tenantId}/sso/test`, { issuer })
+  return http.post<never, SsoTestResult>(`/platform/tenants/${tenantId}/sso/test`, { issuer })
 }
 
 export interface SsoIdentity {
@@ -96,7 +96,7 @@ export interface SsoIdentity {
 }
 
 export function listSsoIdentities(tenantId: string, status?: string) {
-  return http.get<never, SsoIdentity[]>(`/api/platform/tenants/${tenantId}/sso/identities`, {
+  return http.get<never, SsoIdentity[]>(`/platform/tenants/${tenantId}/sso/identities`, {
     params: { status },
   })
 }
@@ -110,16 +110,16 @@ export interface SsoCandidate {
 }
 
 export function listSsoCandidates(tenantId: string) {
-  return http.get<never, SsoCandidate[]>(`/api/platform/tenants/${tenantId}/sso/candidates`)
+  return http.get<never, SsoCandidate[]>(`/platform/tenants/${tenantId}/sso/candidates`)
 }
 
 export function bindSsoIdentity(tenantId: string, identityId: string, username: string, ssoOnly: boolean) {
   return http.post<never, SsoIdentity>(
-    `/api/platform/tenants/${tenantId}/sso/identities/${identityId}/bind`,
+    `/platform/tenants/${tenantId}/sso/identities/${identityId}/bind`,
     { username, ssoOnly },
   )
 }
 
 export function unbindSsoIdentity(tenantId: string, identityId: string) {
-  return http.post<never, SsoIdentity>(`/api/platform/tenants/${tenantId}/sso/identities/${identityId}/unbind`)
+  return http.post<never, SsoIdentity>(`/platform/tenants/${tenantId}/sso/identities/${identityId}/unbind`)
 }

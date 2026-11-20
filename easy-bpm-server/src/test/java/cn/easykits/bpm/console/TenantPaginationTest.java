@@ -69,7 +69,7 @@ class TenantPaginationTest {
 
     @Test
     void paginatesWithStableOrdering() throws Exception {
-        mockMvc.perform(get("/api/platform/tenants").param("keyword", prefix)
+        mockMvc.perform(get("/platform/tenants").param("keyword", prefix)
                         .param("page", "1").param("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
@@ -80,7 +80,7 @@ class TenantPaginationTest {
                 .andExpect(jsonPath("$.data.list[0].code").value(prefix + "-c"))
                 .andExpect(jsonPath("$.data.list[1].code").value(prefix + "-a"));
 
-        mockMvc.perform(get("/api/platform/tenants").param("keyword", prefix)
+        mockMvc.perform(get("/platform/tenants").param("keyword", prefix)
                         .param("page", "2").param("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(3))
@@ -91,7 +91,7 @@ class TenantPaginationTest {
 
     @Test
     void defaultsToFirstPageAndTrimsKeyword() throws Exception {
-        mockMvc.perform(get("/api/platform/tenants")
+        mockMvc.perform(get("/platform/tenants")
                         .param("keyword", "  " + prefix.toUpperCase(Locale.ROOT) + "  "))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.page").value(1))
@@ -102,17 +102,17 @@ class TenantPaginationTest {
 
     @Test
     void searchesCodeNameAndRemarkCaseInsensitively() throws Exception {
-        mockMvc.perform(get("/api/platform/tenants").param("keyword", prefix + "-b"))
+        mockMvc.perform(get("/platform/tenants").param("keyword", prefix + "-b"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(1))
                 .andExpect(jsonPath("$.data.list[0].code").value(prefix + "-b"));
 
-        mockMvc.perform(get("/api/platform/tenants").param("keyword", prefix + " HR TEAM"))
+        mockMvc.perform(get("/platform/tenants").param("keyword", prefix + " HR TEAM"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(1))
                 .andExpect(jsonPath("$.data.list[0].code").value(prefix + "-c"));
 
-        mockMvc.perform(get("/api/platform/tenants").param("keyword", prefix + " RATEX100ABC"))
+        mockMvc.perform(get("/platform/tenants").param("keyword", prefix + " RATEX100ABC"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(1))
                 .andExpect(jsonPath("$.data.list[0].code").value(prefix + "-b"));
@@ -121,7 +121,7 @@ class TenantPaginationTest {
     @Test
     void treatsWildcardCharactersAsLiteralText() throws Exception {
         for (String keyword : List.of(prefix + " rate_100%", prefix + " rate_100%!")) {
-            mockMvc.perform(get("/api/platform/tenants").param("keyword", keyword))
+            mockMvc.perform(get("/platform/tenants").param("keyword", keyword))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.total").value(1))
                     .andExpect(jsonPath("$.data.list[0].code").value(prefix + "-a"));
@@ -130,14 +130,14 @@ class TenantPaginationTest {
 
     @Test
     void clampsPageAndSize() throws Exception {
-        mockMvc.perform(get("/api/platform/tenants").param("keyword", prefix)
+        mockMvc.perform(get("/platform/tenants").param("keyword", prefix)
                         .param("page", "-1").param("size", "0"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.page").value(1))
                 .andExpect(jsonPath("$.data.size").value(1))
                 .andExpect(jsonPath("$.data.list.length()").value(1));
 
-        mockMvc.perform(get("/api/platform/tenants").param("keyword", prefix)
+        mockMvc.perform(get("/platform/tenants").param("keyword", prefix)
                         .param("page", "1").param("size", "1000"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.size").value(100))
@@ -146,13 +146,13 @@ class TenantPaginationTest {
 
     @Test
     void handlesEmptySearchAndOutOfRangePages() throws Exception {
-        mockMvc.perform(get("/api/platform/tenants").param("keyword", prefix)
+        mockMvc.perform(get("/platform/tenants").param("keyword", prefix)
                         .param("page", "3").param("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(3))
                 .andExpect(jsonPath("$.data.list.length()").value(0));
 
-        mockMvc.perform(get("/api/platform/tenants").param("keyword", prefix + "-missing"))
+        mockMvc.perform(get("/platform/tenants").param("keyword", prefix + "-missing"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(0))
                 .andExpect(jsonPath("$.data.list.length()").value(0));
@@ -162,13 +162,13 @@ class TenantPaginationTest {
     void requiresPlatformAdmin() throws Exception {
         for (String role : List.of("TENANT_ADMIN", "MEMBER")) {
             CurrentUser.set(new AuthPrincipal("other-user", callerTenantId, "其他用户", role, null));
-            mockMvc.perform(get("/api/platform/tenants"))
+            mockMvc.perform(get("/platform/tenants"))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value(40300));
         }
 
         CurrentUser.clear();
-        mockMvc.perform(get("/api/platform/tenants"))
+        mockMvc.perform(get("/platform/tenants"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(40100));
     }
@@ -179,14 +179,14 @@ class TenantPaginationTest {
         insertUser(tenantA.getId(), "member-a");
         insertUser(tenantB.getId(), "admin-b");
 
-        mockMvc.perform(get("/api/platform/tenants").param("keyword", prefix)
+        mockMvc.perform(get("/platform/tenants").param("keyword", prefix)
                         .param("page", "2").param("size", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.list[0].code").value(prefix + "-a"))
                 .andExpect(jsonPath("$.data.list[0].consoleUserCount").value(2));
         assertEquals(callerTenantId, TenantContext.require());
 
-        mockMvc.perform(get("/api/platform/tenants").param("keyword", prefix)
+        mockMvc.perform(get("/platform/tenants").param("keyword", prefix)
                         .param("page", "3").param("size", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.list[0].code").value(prefix + "-b"))

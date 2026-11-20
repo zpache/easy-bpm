@@ -2,7 +2,7 @@ import http from '@/api/request'
 import type { LoginUser } from './types'
 
 export function login(tenantCode: string, username: string, password: string) {
-  return http.post<never, { token: string; user: LoginUser }>('/api/auth/login', {
+  return http.post<never, { token: string; user: LoginUser }>('/auth/login', {
     tenantCode,
     username,
     password,
@@ -10,5 +10,5 @@ export function login(tenantCode: string, username: string, password: string) {
 }
 
 export function fetchMe() {
-  return http.get<never, LoginUser>('/api/auth/me')
+  return http.get<never, LoginUser>('/auth/me')
 }

@@ -36,7 +36,9 @@ public class WebConfig implements WebMvcConfigurer {
     @Bean
     public FilterRegistrationBean<ConsoleAuthFilter> consoleFilterRegistration(ConsoleAuthFilter filter) {
         FilterRegistrationBean<ConsoleAuthFilter> bean = new FilterRegistrationBean<>(filter);
-        bean.setUrlPatterns(List.of("/api/*"));
+        // 控制台接口无统一 /api 前缀，逐前缀注册鉴权过滤器
+        bean.setUrlPatterns(List.of("/auth/*", "/flows/*", "/workbench/*", "/org/*", "/tenant/*",
+                "/instances/*", "/audit/*", "/dashboard/*", "/platform/*", "/public/*"));
         bean.setOrder(20);
         return bean;
     }

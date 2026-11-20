@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 控制台工作台。审批人身份取登录账号绑定的 externalUserId。
  */
 @RestController
-@RequestMapping("/api/workbench")
+@RequestMapping("/workbench")
 public class ConsoleWorkbenchController {
 
     private final WorkbenchQueryService query;

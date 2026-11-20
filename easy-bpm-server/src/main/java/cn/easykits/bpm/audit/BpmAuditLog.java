@@ -8,7 +8,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 控制台敏感操作审计。写入走 AuditService，查询走 /api/audit/logs。
+ * 控制台敏感操作审计。写入走 AuditService，查询走 /audit/logs。
  */
 @Data
 @TableName("bpm_audit_log")

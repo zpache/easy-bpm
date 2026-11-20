@@ -15,7 +15,7 @@ mkdirSync(OUT, { recursive: true })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 async function apiLogin(tenantCode, username) {
-  const res = await fetch(`${API}/api/auth/login`, {
+  const res = await fetch(`/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tenantCode, username, password: 'admin123' }),
@@ -99,7 +99,7 @@ async function main() {
   try {
     const res = await page.evaluate(async () => {
       const token = localStorage.getItem('easy_bpm_token')
-      const r = await fetch('/api/instances?page=1&size=50', {
+      const r = await fetch('/instances?page=1&size=50', {
         headers: { Authorization: `Bearer ${token}` },
       })
       return r.json()

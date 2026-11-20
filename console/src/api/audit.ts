@@ -9,5 +9,5 @@ export interface AuditLogParams {
 }
 
 export function auditLogs(params: AuditLogParams) {
-  return http.get<never, PageResult<AuditView>>('/api/audit/logs', { params })
+  return http.get<never, PageResult<AuditView>>('/audit/logs', { params })
 }

@@ -21,7 +21,7 @@ import java.util.List;
  * 控制台操作审计查询（仅租户管理员）。
  */
 @RestController
-@RequestMapping("/api/audit")
+@RequestMapping("/audit")
 public class ConsoleAuditController {
 
     private final BpmAuditLogMapper auditMapper;

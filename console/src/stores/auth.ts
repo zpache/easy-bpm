@@ -33,7 +33,7 @@ export const useAuthStore = defineStore('auth', {
   },
   actions: {
     async login(tenantCode: string, username: string, password: string) {
-      const data = await http.post<never, LoginResponse>('/api/auth/login', {
+      const data = await http.post<never, LoginResponse>('/auth/login', {
         tenantCode,
         username,
         password,

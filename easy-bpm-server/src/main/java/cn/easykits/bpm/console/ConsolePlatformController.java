@@ -47,7 +47,7 @@ import java.util.Locale;
  * 其余业务表统计需 TenantContext.callAs 切换上下文。
  */
 @RestController
-@RequestMapping("/api/platform")
+@RequestMapping("/platform")
 public class ConsolePlatformController {
 
     /** 平台租户编码，与 DemoDataInitializer 保持一致 */

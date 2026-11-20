@@ -58,7 +58,7 @@ docker compose up -d --build
 | `EASY_BPM_RATE_LIMIT` | OpenAPI 限流（次/分钟，按 AppKey，0 关闭） | `600` |
 | `EASY_BPM_SSO_ENABLED` | 控制台单点登录开关 | `true` |
 | `EASY_BPM_CONSOLE_BASE_URL` | 控制台外部地址（SSO 回调后跳回） | `http://localhost:8091` |
-| `EASY_BPM_SSO_REDIRECT_URI` | IdP 回调地址，需与 IdP 侧登记值一致 | `http://localhost:8091/api/auth/sso/callback` |
+| `EASY_BPM_SSO_REDIRECT_URI` | IdP 回调地址，需与 IdP 侧登记值一致 | `http://localhost:8091/auth/sso/callback` |
 
 ### 3.2 Webhook 回调（P4）
 
@@ -109,7 +109,7 @@ docker compose up -d --build
 |---|---|---|
 | `EASY_BPM_SSO_ENABLED` | 总开关；关闭后登录页不再探测，授权接口直接拒绝 | `true` |
 | `EASY_BPM_CONSOLE_BASE_URL` | 控制台对外地址，回调成功后跳回这里 | `http://localhost:8091` |
-| `EASY_BPM_SSO_REDIRECT_URI` | 默认回调地址，**必须与 IdP 登记值完全一致**；租户配置可覆盖 | `.../api/auth/sso/callback` |
+| `EASY_BPM_SSO_REDIRECT_URI` | 默认回调地址，**必须与 IdP 登记值完全一致**；租户配置可覆盖 | `.../auth/sso/callback` |
 
 上线步骤：
 

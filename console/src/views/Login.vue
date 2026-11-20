@@ -118,7 +118,7 @@ function onSso(provider: SsoProviderBrief) {
     params.set('redirect', redirect)
   }
   // 交给浏览器整页跳转：先到后端 /authorize，再由后端 302 到企业 IdP
-  window.location.href = `/api/auth/sso/authorize?${params.toString()}`
+  window.location.href = `/auth/sso/authorize?${params.toString()}`
 }
 
 onMounted(() => {

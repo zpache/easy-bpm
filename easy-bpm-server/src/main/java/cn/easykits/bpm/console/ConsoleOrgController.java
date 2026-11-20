@@ -41,7 +41,7 @@ import java.util.Map;
  * 表受租户插件隔离，无需手动加租户条件。
  */
 @RestController
-@RequestMapping("/api/org")
+@RequestMapping("/org")
 public class ConsoleOrgController {
 
     private final OrgUserMapper userMapper;

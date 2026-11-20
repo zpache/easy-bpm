@@ -19,7 +19,7 @@
 
 1. 建 Realm（如 `acme`），建 OIDC Client（如 `easy-bpm`）；
 2. Client authentication 打开（机密客户端），记下 Client ID / Client Secret；
-3. Valid redirect URIs 填 `http://localhost:8091/api/auth/sso/callback`（与 `EASY_BPM_SSO_REDIRECT_URI` 完全一致，生产换成 https 域名）；
+3. Valid redirect URIs 填 `http://localhost:8091/auth/sso/callback`（与 `EASY_BPM_SSO_REDIRECT_URI` 完全一致，生产换成 https 域名）；
 4. 给用户补 `email`、`name` 属性，`sub` 保持稳定（不要用会变的用户名做 sub）。
 
 本地起一个 Keycloak 联调：
@@ -45,21 +45,21 @@ issuer 即 `http://localhost:8080/realms/acme`。
 
 ```
 浏览器            控制台后端                     企业 IdP
-  │  GET /api/auth/sso/providers?tenantCode=   │
+  │  GET /auth/sso/providers?tenantCode=   │
   │ ──────────────────────────────────────────>│  返回启用的登录方式（仅 code/name）
-  │  GET /api/auth/sso/authorize?tenantCode=&provider=&redirect=
+  │  GET /auth/sso/authorize?tenantCode=&provider=&redirect=
   │ ──────────────────────────────────────────>
   │        生成 state + nonce + PKCE verifier（服务端暂存 5 分钟）
   │ <────────── 302 到 authorization_endpoint ──┤
   │ ─────────────── 用户在 IdP 认证 ───────────>│
-  │ <── 302 /api/auth/sso/callback?code=&state=┤
+  │ <── 302 /auth/sso/callback?code=&state=┤
   │                                            │  ① state 取出即删（防重放 / CSRF）
   │                                            │  ② code + verifier + secret 换 token
   │                                            │  ③ 验 id_token：签名(JWKS)/iss/aud/exp/nonce
   │                                            │  ④ userinfo 补 name/email（失败不阻断）
   │                                            │  ⑤ 查绑定：无绑定 → 记 PENDING 并拒绝
   │ <── 302 /sso/callback?ticket=一次性票据 ────┤
-  │  POST /api/auth/sso/exchange {ticket}      │
+  │  POST /auth/sso/exchange {ticket}      │
   │ ──────────────────────────────────────────>│  签发本地 JWT（60 秒内单次消费）
 ```
 
@@ -129,7 +129,7 @@ JWT 不进 URL：回调只带一次性 ticket，前端换到 token 后与密码�
 - 只支持 RSA 签名的 id_token，使用 ES256 的 IdP 需要扩展 `OidcClient#verifyIdToken`；
 - 未实现 SAML 2.0 与 SCIM 增量同步（组织同步仍走 `/open/v1/org/sync`）；
 - 未实现单点登出（IdP 侧退出后本地会话不会同步失效，最长残留一个 token TTL）；
-- 授权接口未单独限流，建议在网关层对 `/api/auth/sso/*` 做频率限制。
+- 授权接口未单独限流，建议在网关层对 `/auth/sso/*` 做频率限制。
 
 ## 8. 测试指南
 
@@ -141,17 +141,17 @@ JWT 不进 URL：回调只带一次性 ticket，前端换到 token 后与密码�
 
 ```bash
 # 1. 未配置 IdP：返回空数组
-curl -s 'http://localhost:8082/api/auth/sso/providers?tenantCode=demo'
+curl -s 'http://localhost:8082/auth/sso/providers?tenantCode=demo'
 
 # 2. 配置一个假 IdP 后（Issuer 随便填），providers 应返回 [{code:"default",name:...}]
 # 3. 授权跳转：issuer 的 discovery 不可达时会返回 JSON 错误而非 302
-curl -s -o /dev/null -w '%{http_code}' 'http://localhost:8082/api/auth/sso/authorize?tenantCode=demo'
+curl -s -o /dev/null -w '%{http_code}' 'http://localhost:8082/auth/sso/authorize?tenantCode=demo'
 
 # 4. 伪造 state 回调 → 302 到 /sso/callback?error=STATE_INVALID
-curl -s -o /dev/null -w '%{redirect_url}' 'http://localhost:8082/api/auth/sso/callback?code=x&state=fake'
+curl -s -o /dev/null -w '%{redirect_url}' 'http://localhost:8082/auth/sso/callback?code=x&state=fake'
 
 # 5. 伪造 ticket 换登录态 → 明确报「登录凭证已失效」
-curl -s -X POST 'http://localhost:8082/api/auth/sso/exchange' \
+curl -s -X POST 'http://localhost:8082/auth/sso/exchange' \
   -H 'Content-Type: application/json' -d '{"ticket":"fake"}'
 ```
 

@@ -17,7 +17,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 控制台登录态校验：/api/** 除登录接口外都必须带 Bearer Token。
+ * 控制台登录态校验：各控制台前缀/** 除登录接口外都必须带 Bearer Token。
  */
 @Component
 public class ConsoleAuthFilter extends OncePerRequestFilter {
@@ -35,11 +35,10 @@ public class ConsoleAuthFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return !path.startsWith("/api/")
-                || path.equals("/api/auth/login")
+        return path.equals("/auth/login")
                 // SSO 授权跳转与回调依赖 IdP state/nonce/PKCE，且发生在登录之前
-                || path.startsWith("/api/auth/sso/")
-                || path.startsWith("/api/public/");
+                || path.startsWith("/auth/sso/")
+                || path.startsWith("/public/");
     }
 
     @Override

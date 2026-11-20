@@ -50,7 +50,7 @@ class FlowDefinitionPaginationTest {
 
     @Test
     void paginatesWithStableOrdering() throws Exception {
-        mockMvc.perform(get("/api/flows").param("page", "1").param("size", "2"))
+        mockMvc.perform(get("/flows").param("page", "1").param("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.total").value(3))
@@ -60,7 +60,7 @@ class FlowDefinitionPaginationTest {
                 .andExpect(jsonPath("$.data.list[0].code").value("flow_c"))
                 .andExpect(jsonPath("$.data.list[1].code").value("flow_a"));
 
-        mockMvc.perform(get("/api/flows").param("page", "2").param("size", "2"))
+        mockMvc.perform(get("/flows").param("page", "2").param("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(3))
                 .andExpect(jsonPath("$.data.page").value(2))
@@ -70,7 +70,7 @@ class FlowDefinitionPaginationTest {
 
     @Test
     void preservesFullListForFlowSelectors() throws Exception {
-        mockMvc.perform(get("/api/flows"))
+        mockMvc.perform(get("/flows"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(3))
                 .andExpect(jsonPath("$.data[0].code").value("flow_c"));
@@ -78,7 +78,7 @@ class FlowDefinitionPaginationTest {
 
     @Test
     void defaultsToTwentyRecordsPerPage() throws Exception {
-        mockMvc.perform(get("/api/flows").param("page", "1"))
+        mockMvc.perform(get("/flows").param("page", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.size").value(20))
                 .andExpect(jsonPath("$.data.list.length()").value(3));
@@ -86,13 +86,13 @@ class FlowDefinitionPaginationTest {
 
     @Test
     void clampsPageAndSize() throws Exception {
-        mockMvc.perform(get("/api/flows").param("page", "0").param("size", "0"))
+        mockMvc.perform(get("/flows").param("page", "0").param("size", "0"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.page").value(1))
                 .andExpect(jsonPath("$.data.size").value(1))
                 .andExpect(jsonPath("$.data.list.length()").value(1));
 
-        mockMvc.perform(get("/api/flows").param("page", "-1").param("size", "1000"))
+        mockMvc.perform(get("/flows").param("page", "-1").param("size", "1000"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.page").value(1))
                 .andExpect(jsonPath("$.data.size").value(100))
@@ -101,7 +101,7 @@ class FlowDefinitionPaginationTest {
 
     @Test
     void returnsEmptyListBeyondLastPage() throws Exception {
-        mockMvc.perform(get("/api/flows").param("page", "3").param("size", "2"))
+        mockMvc.perform(get("/flows").param("page", "3").param("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(3))
                 .andExpect(jsonPath("$.data.page").value(3))
@@ -113,7 +113,7 @@ class FlowDefinitionPaginationTest {
         TenantContext.set(Ids.id());
         insertFlow("other_tenant_flow", UPDATED_AT);
 
-        mockMvc.perform(get("/api/flows").param("page", "1").param("size", "2"))
+        mockMvc.perform(get("/flows").param("page", "1").param("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(1))
                 .andExpect(jsonPath("$.data.list.length()").value(1))

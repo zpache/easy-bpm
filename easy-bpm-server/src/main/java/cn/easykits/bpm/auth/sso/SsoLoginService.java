@@ -62,7 +62,7 @@ public class SsoLoginService {
                            OidcClient oidc, JwtService jwtService, SsoTicketStore tickets, AuditService audit,
                            @Value("${easybpm.sso.enabled:true}") boolean enabled,
                            @Value("${easybpm.sso.console-base-url:http://localhost:8091}") String consoleBaseUrl,
-                           @Value("${easybpm.sso.default-redirect-uri:http://localhost:8091/api/auth/sso/callback}")
+                           @Value("${easybpm.sso.default-redirect-uri:http://localhost:8091/auth/sso/callback}")
                            String defaultRedirectUri) {
         this.providerMapper = providerMapper;
         this.identityMapper = identityMapper;

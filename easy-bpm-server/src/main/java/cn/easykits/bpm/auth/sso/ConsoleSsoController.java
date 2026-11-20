@@ -23,7 +23,7 @@ import java.util.List;
  * state/nonce/PKCE 与一次性 ticket，不依赖本地登录态。
  */
 @RestController
-@RequestMapping("/api/auth/sso")
+@RequestMapping("/auth/sso")
 @Tag(name = "控制台 SSO 登录")
 public class ConsoleSsoController {
 

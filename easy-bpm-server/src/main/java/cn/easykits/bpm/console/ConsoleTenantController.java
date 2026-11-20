@@ -31,7 +31,7 @@ import java.util.List;
  * 凭证表不参与租户插件隔离（认证前置），因此这里全部手动加 tenantId 条件。
  */
 @RestController
-@RequestMapping("/api/tenant")
+@RequestMapping("/tenant")
 public class ConsoleTenantController {
 
     private static final SecureRandom RANDOM = new SecureRandom();

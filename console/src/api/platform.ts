@@ -8,7 +8,7 @@ export interface TenantListParams {
 }
 
 export function listTenants(params: TenantListParams = {}) {
-  return http.get<never, PageResult<PlatformTenantView>>('/api/platform/tenants', { params })
+  return http.get<never, PageResult<PlatformTenantView>>('/platform/tenants', { params })
 }
 
 export interface CreateTenantPayload {
@@ -21,7 +21,7 @@ export interface CreateTenantPayload {
 }
 
 export function createTenant(payload: CreateTenantPayload) {
-  return http.post<never, PlatformTenantView>('/api/platform/tenants', payload)
+  return http.post<never, PlatformTenantView>('/platform/tenants', payload)
 }
 
 export interface UpdateTenantPayload {
@@ -30,17 +30,17 @@ export interface UpdateTenantPayload {
 }
 
 export function updateTenant(id: string, payload: UpdateTenantPayload) {
-  return http.post<never, PlatformTenantView>(`/api/platform/tenants/${id}`, payload)
+  return http.post<never, PlatformTenantView>(`/platform/tenants/${id}`, payload)
 }
 
 export function disableTenant(id: string) {
-  return http.post<never, PlatformTenantView>(`/api/platform/tenants/${id}/disable`)
+  return http.post<never, PlatformTenantView>(`/platform/tenants/${id}/disable`)
 }
 
 export function enableTenant(id: string) {
-  return http.post<never, PlatformTenantView>(`/api/platform/tenants/${id}/enable`)
+  return http.post<never, PlatformTenantView>(`/platform/tenants/${id}/enable`)
 }
 
 export function switchTenant(id: string) {
-  return http.post<never, PlatformTenantSwitch>(`/api/platform/tenants/${id}/switch`)
+  return http.post<never, PlatformTenantSwitch>(`/platform/tenants/${id}/switch`)
 }

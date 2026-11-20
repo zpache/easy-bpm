@@ -21,7 +21,7 @@ import java.util.List;
  * 若租户管理员也能改，就可能把认证指向自己的 IdP 完成账号接管。
  */
 @RestController
-@RequestMapping("/api/platform/tenants/{tenantId}/sso")
+@RequestMapping("/platform/tenants/{tenantId}/sso")
 @Tag(name = "平台管理 - 租户 SSO")
 public class ConsoleSsoAdminController {
 

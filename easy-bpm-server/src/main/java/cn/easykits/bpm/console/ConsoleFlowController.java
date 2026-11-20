@@ -37,7 +37,7 @@ import java.util.Set;
  * 控制台的流程定义管理。写入操作要求租户管理员。
  */
 @RestController
-@RequestMapping("/api/flows")
+@RequestMapping("/flows")
 public class ConsoleFlowController {
 
     private final FlowDefinitionService definitions;

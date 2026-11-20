@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 以及运行中实例的救援操作（强制转办）。
  */
 @RestController
-@RequestMapping("/api/instances")
+@RequestMapping("/instances")
 public class ConsoleInstanceController {
 
     private final WorkbenchQueryService query;
