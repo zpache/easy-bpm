@@ -6,8 +6,9 @@ import cn.easykits.bpm.open.RateLimitFilter;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import java.util.List;
 
@@ -15,7 +16,7 @@ import java.util.List;
  * Web 配置：控制台与管理端分开鉴权，OpenAPI 只认租户凭证。
  */
 @Configuration
-public class WebConfig implements WebMvcConfigurer {
+public class WebConfig {
 
     @Bean
     public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(RateLimitFilter filter) {
@@ -43,13 +44,23 @@ public class WebConfig implements WebMvcConfigurer {
         return bean;
     }
 
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**")
-                .allowedOriginPatterns("*")
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("*")
-                .exposedHeaders("X-Trace-Id")
-                .maxAge(3600);
+    /**
+     * CORS 以 Servlet Filter 实现（order 15，先于控制台鉴权过滤器 20）：
+     * 浏览器预检 OPTIONS 请求不带 Authorization 头，若由 MVC 层处理会被鉴权过滤器
+     * 先行 401 且无 CORS 响应头，浏览器表现为跨域错误。
+     */
+    @Bean
+    public FilterRegistrationBean<CorsFilter> corsFilterRegistration() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.addAllowedOriginPattern("*");
+        config.addAllowedMethod("*");
+        config.addAllowedHeader("*");
+        config.addExposedHeader("X-Trace-Id");
+        config.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        FilterRegistrationBean<CorsFilter> bean = new FilterRegistrationBean<>(new CorsFilter(source));
+        bean.setOrder(15);
+        return bean;
     }
 }
