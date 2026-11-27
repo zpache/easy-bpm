@@ -17,6 +17,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 组织数据读取与同步。审批人解析全部走这里，接入方只需同步组织，不需要把人员关系传给审批引擎。
@@ -135,6 +136,17 @@ public class OrgService {
         return roleMapper.selectList(new LambdaQueryWrapper<OrgUserRole>()
                         .eq(OrgUserRole::getRoleCode, roleCode))
                 .stream().map(OrgUserRole::getUserCode).distinct().toList();
+    }
+
+    /** 批量查一组人员的角色编码，返回 userCode -> roleCodes（无角色的人员不在结果中）。 */
+    public Map<String, List<String>> rolesByUsers(Collection<String> userCodes) {
+        if (userCodes == null || userCodes.isEmpty()) {
+            return Map.of();
+        }
+        return roleMapper.selectList(new LambdaQueryWrapper<OrgUserRole>()
+                        .in(OrgUserRole::getUserCode, userCodes))
+                .stream().collect(Collectors.groupingBy(OrgUserRole::getUserCode,
+                        Collectors.mapping(OrgUserRole::getRoleCode, Collectors.toList())));
     }
 
     /** 过滤出状态为 ACTIVE 的人员（不存在或已停用的一律剔除），用于审批人解析。 */

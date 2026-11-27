@@ -90,10 +90,13 @@ public class ConsoleOrgController {
                 .orderByDesc(OrgUser::getUpdatedAt);
         Page<OrgUser> result = userMapper.selectPage(new Page<>(Math.max(page, 1),
                 Math.min(Math.max(size, 1), 100)), wrapper);
+        // 批量附带每人角色编码：供前端编辑回填（避免编辑保存时误清空角色）
+        Map<String, List<String>> rolesByUser = orgService.rolesByUsers(
+                result.getRecords().stream().map(OrgUser::getUserCode).toList());
         List<UserView> views = result.getRecords().stream()
                 .map(u -> new UserView(u.getUserCode(), u.getName(), u.getDeptCode(), u.getDeptName(),
                         u.getLeaderCode(), u.getTitle(), u.getMobile(), u.getEmail(), u.getStatus(),
-                        u.getUpdatedAt()))
+                        rolesByUser.getOrDefault(u.getUserCode(), List.of()), u.getUpdatedAt()))
                 .toList();
         return ApiResponse.ok(PageResult.of(views, result.getTotal(), page, size));
     }
@@ -287,7 +290,7 @@ public class ConsoleOrgController {
 
     public record UserView(String userCode, String name, String deptCode, String deptName,
                            String leaderCode, String title, String mobile, String email,
-                           String status, LocalDateTime updatedAt) {
+                           String status, List<String> roleCodes, LocalDateTime updatedAt) {
     }
 
     public record RoleView(String roleCode, int userCount) {

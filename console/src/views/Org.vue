@@ -155,8 +155,8 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="角色" prop="roleCodes">
-          <el-select v-model="userForm.roleCodes" multiple filterable allow-create default-first-option
-                     placeholder="输入或选择角色编码，可创建新角色" style="width: 100%">
+          <el-select v-model="userForm.roleCodes" multiple filterable
+                     placeholder="选择角色编码（新角色请在角色页签创建）" style="width: 100%">
             <el-option v-for="r in roles" :key="r.roleCode" :label="`${r.roleCode}(${r.userCount}人)`" :value="r.roleCode" />
           </el-select>
         </el-form-item>
@@ -401,6 +401,8 @@ function openUserDialog(row?: OrgUserView) {
   userForm.mobile = row?.mobile || ''
   userForm.email = row?.email || ''
   userForm.status = row?.status || 'ACTIVE'
+  // 新增时清空上次表单残留；编辑时回填该人已有角色（避免保存误清空）
+  userForm.roleCodes = row?.roleCodes ? [...row.roleCodes] : []
   userVisible.value = true
   nextTick(() => userFormRef.value?.clearValidate())
 }

@@ -132,6 +132,7 @@ export interface OrgUserView {
   mobile?: string
   email?: string
   status: string
+  roleCodes?: string[]
   updatedAt?: string
 }
 
