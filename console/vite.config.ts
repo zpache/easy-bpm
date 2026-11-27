@@ -1,8 +1,17 @@
 import { ZipArchive } from 'archiver'
 import fs from 'node:fs'
+import type { IncomingMessage } from 'node:http'
 import { defineConfig, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
+
+/**
+ * 与 SPA 页面路由重名的接口前缀：整页导航/刷新（Accept: text/html）回退到 index.html，
+ * 只有 XHR（Accept: application/json）才代理到后端。
+ * 否则浏览器直接回车 /org、/tenant、/audit 等地址时，GET 请求会被代理到后端并被鉴权过滤器拒绝（缺少登录凭证）。
+ */
+const spaFallback = (req: IncomingMessage) =>
+  req.headers.accept?.includes('text/html') ? '/index.html' : undefined
 
 /**
  * 构建完成后自动把 dist/ 压缩为 dist.zip（供产线解压覆盖 nginx 目录）。
@@ -49,35 +58,35 @@ export default defineConfig({
       // /flows、/workbench 等与 SPA 页面路由重名：浏览器整页导航（Accept: text/html）回退到 SPA，
       // XHR（Accept: application/json）走代理；/auth/sso/authorize 是登录整页跳转，不 bypass。
       '/auth': { target: 'http://127.0.0.1:8082', changeOrigin: true },
-      '/org': { target: 'http://127.0.0.1:8082', changeOrigin: true },
-      '/tenant': { target: 'http://127.0.0.1:8082', changeOrigin: true },
-      '/audit': { target: 'http://127.0.0.1:8082', changeOrigin: true },
+      '/org': { target: 'http://127.0.0.1:8082', changeOrigin: true, bypass: spaFallback },
+      '/tenant': { target: 'http://127.0.0.1:8082', changeOrigin: true, bypass: spaFallback },
+      '/audit': { target: 'http://127.0.0.1:8082', changeOrigin: true, bypass: spaFallback },
       '/open': { target: 'http://127.0.0.1:8082', changeOrigin: true },
       '/public': { target: 'http://127.0.0.1:8082', changeOrigin: true },
       '/flows': {
         target: 'http://127.0.0.1:8082',
         changeOrigin: true,
-        bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
+        bypass: spaFallback,
       },
       '/workbench': {
         target: 'http://127.0.0.1:8082',
         changeOrigin: true,
-        bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
+        bypass: spaFallback,
       },
       '/instances': {
         target: 'http://127.0.0.1:8082',
         changeOrigin: true,
-        bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
+        bypass: spaFallback,
       },
       '/platform': {
         target: 'http://127.0.0.1:8082',
         changeOrigin: true,
-        bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
+        bypass: spaFallback,
       },
       '/dashboard': {
         target: 'http://127.0.0.1:8082',
         changeOrigin: true,
-        bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
+        bypass: spaFallback,
       },
     },
   },
