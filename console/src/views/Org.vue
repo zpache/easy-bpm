@@ -20,7 +20,7 @@
         </div>
         <el-table :data="users" v-loading="usersLoading">
           <template #empty><el-empty description="暂无人员数据" :image-size="80" /></template>
-          <el-table-column prop="userCode" label="人员编码" width="120" />
+          <el-table-column prop="userCode" label="人员编码" width="150" />
           <el-table-column prop="name" label="姓名" width="110" />
           <el-table-column prop="deptName" label="部门" min-width="130" show-overflow-tooltip>
             <template #default="{ row }">{{ row.deptName || '-' }}</template>
