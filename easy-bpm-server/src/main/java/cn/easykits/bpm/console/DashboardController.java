@@ -39,7 +39,8 @@ public class DashboardController {
 
     @GetMapping("/summary")
     public ApiResponse<DashboardSummary> summary() {
-        WorkbenchCounts counts = query.counts(CurrentUser.requireApproverId());
+        // 管理视角：统计口径与工作台一致，取本租户全量而非某个个人
+        WorkbenchCounts counts = query.countsByTenant();
         Map<String, Long> statusStats = new LinkedHashMap<>();
         long total = 0;
         for (InstanceStatus status : InstanceStatus.values()) {

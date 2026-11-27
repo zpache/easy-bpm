@@ -95,7 +95,7 @@ java -jar target/easy-bpm-server.jar --spring.profiles.active=local
 | 项 | 值 |
 |---|---|
 | 租户编码 | `demo` |
-| 控制台账号 | `admin / admin123`（李四 `lisi`、王五 `wangwu`，密码同） |
+| 控制台账号 | `admin / admin123`（租户管理员 TENANT_ADMIN）；控制台仅管理员可登录，员工身份由业务系统通过 OpenAPI 传入 |
 | 平台管理员 | 租户编码 `platform`，账号 `platadmin / admin123`（角色 PLATFORM_ADMIN） |
 | AppKey / AppSecret | `ak_demo` / `sk_demo_2026` |
 | 演示流程 | `leave` 请假审批、`expense` 费用报销（金额 > 5000 加财务审批） |

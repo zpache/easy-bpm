@@ -2,38 +2,37 @@ package cn.easykits.bpm.console;
 
 import cn.easykits.bpm.auth.CurrentUser;
 import cn.easykits.bpm.common.ApiResponse;
+import cn.easykits.bpm.common.BizException;
+import cn.easykits.bpm.common.ErrorCode;
 import cn.easykits.bpm.common.PageResult;
-import cn.easykits.bpm.engine.ActionResult;
 import cn.easykits.bpm.engine.CcView;
-import cn.easykits.bpm.engine.FlowEngineService;
 import cn.easykits.bpm.engine.InstanceDetail;
 import cn.easykits.bpm.engine.InstanceView;
 import cn.easykits.bpm.engine.TaskView;
 import cn.easykits.bpm.engine.WorkbenchCounts;
 import cn.easykits.bpm.engine.WorkbenchQueryService;
-import cn.easykits.bpm.open.OpenDtos;
-import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 控制台工作台。审批人身份取登录账号绑定的 externalUserId。
+ * 控制台工作台（管理视角）。
+ *
+ * <p>面向租户管理员，展示当前租户的全量待办/已办/发起/抄送，不绑定任何个人审批身份。
+ * 审批动作由接入方业务系统通过 OpenAPI 以真实 userId 完成，控制台仅供查看与跟踪，
+ * 故此处不提供 approve/reject 接口，杜绝管理员代审批导致的留痕失真。
  */
 @RestController
 @RequestMapping("/workbench")
 public class ConsoleWorkbenchController {
 
     private final WorkbenchQueryService query;
-    private final FlowEngineService engine;
 
-    public ConsoleWorkbenchController(WorkbenchQueryService query, FlowEngineService engine) {
+    public ConsoleWorkbenchController(WorkbenchQueryService query) {
         this.query = query;
-        this.engine = engine;
     }
 
     @GetMapping("/todo")
@@ -41,7 +40,8 @@ public class ConsoleWorkbenchController {
                                                   @RequestParam(defaultValue = "20") int size,
                                                   @RequestParam(required = false) String flowCode,
                                                   @RequestParam(required = false) String keyword) {
-        return ApiResponse.ok(query.todo(CurrentUser.requireApproverId(), page(page), size(size), flowCode, keyword));
+        requireTenantAdmin();
+        return ApiResponse.ok(query.todoByTenant(page(page), size(size), flowCode, keyword));
     }
 
     @GetMapping("/done")
@@ -49,7 +49,8 @@ public class ConsoleWorkbenchController {
                                                   @RequestParam(defaultValue = "20") int size,
                                                   @RequestParam(required = false) String flowCode,
                                                   @RequestParam(required = false) String keyword) {
-        return ApiResponse.ok(query.done(CurrentUser.requireApproverId(), page(page), size(size), flowCode, keyword));
+        requireTenantAdmin();
+        return ApiResponse.ok(query.doneByTenant(page(page), size(size), flowCode, keyword));
     }
 
     @GetMapping("/submitted")
@@ -58,13 +59,14 @@ public class ConsoleWorkbenchController {
                                                            @RequestParam(required = false) String flowCode,
                                                            @RequestParam(required = false) String status,
                                                            @RequestParam(required = false) String keyword) {
-        return ApiResponse.ok(query.submitted(CurrentUser.requireApproverId(), page(page), size(size),
-                flowCode, status, keyword));
+        requireTenantAdmin();
+        return ApiResponse.ok(query.allInstances(page(page), size(size), flowCode, status, keyword));
     }
 
     @GetMapping("/counts")
     public ApiResponse<WorkbenchCounts> counts() {
-        return ApiResponse.ok(query.counts(CurrentUser.requireApproverId()));
+        requireTenantAdmin();
+        return ApiResponse.ok(query.countsByTenant());
     }
 
     @GetMapping("/cc")
@@ -72,34 +74,27 @@ public class ConsoleWorkbenchController {
                                               @RequestParam(defaultValue = "20") int size,
                                               @RequestParam(defaultValue = "false") boolean unreadOnly,
                                               @RequestParam(required = false) String keyword) {
-        return ApiResponse.ok(query.cc(CurrentUser.requireApproverId(), page(page), size(size),
-                unreadOnly, keyword));
+        requireTenantAdmin();
+        return ApiResponse.ok(query.ccByTenant(page(page), size(size), unreadOnly, keyword));
     }
 
     @PostMapping("/cc/{id}/read")
     public ApiResponse<Void> readCc(@PathVariable String id) {
-        query.markCcRead(id, CurrentUser.requireApproverId());
+        requireTenantAdmin();
+        query.markCcReadByTenant(id);
         return ApiResponse.ok();
     }
 
     @GetMapping("/instances/{instanceId}")
     public ApiResponse<InstanceDetail> detail(@PathVariable String instanceId) {
+        requireTenantAdmin();
         return ApiResponse.ok(query.detail(instanceId));
     }
 
-    @PostMapping("/tasks/{taskId}/approve")
-    public ApiResponse<ActionResult> approve(@PathVariable String taskId,
-                                             @RequestBody(required = false) OpenDtos.HandleRequest request) {
-        String comment = request == null ? null : request.comment();
-        return ApiResponse.ok(engine.approve(taskId, CurrentUser.requireApproverId(), comment,
-                request == null ? null : request.formData()));
-    }
-
-    @PostMapping("/tasks/{taskId}/reject")
-    public ApiResponse<ActionResult> reject(@PathVariable String taskId,
-                                            @RequestBody(required = false) OpenDtos.HandleRequest request) {
-        String comment = request == null ? null : request.comment();
-        return ApiResponse.ok(engine.reject(taskId, CurrentUser.requireApproverId(), comment));
+    private void requireTenantAdmin() {
+        if (!CurrentUser.require().isTenantAdmin()) {
+            throw new BizException(ErrorCode.FORBIDDEN, "工作台仅租户管理员可访问");
+        }
     }
 
     private int page(int page) {

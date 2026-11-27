@@ -65,8 +65,25 @@ public class WorkbenchQueryService {
     }
 
     public PageResult<TaskView> todo(String userId, int page, int size, String flowCode, String keyword) {
+        return todo(userId, page, size, flowCode, keyword, false);
+    }
+
+    /**
+     * 管理视角：本租户全部在办任务，不按办理人过滤，仅按租户隔离。
+     * 与 OpenAPI 的个人待办共用同一查询与投影逻辑。
+     */
+    public PageResult<TaskView> todoByTenant(int page, int size, String flowCode, String keyword) {
+        return todo(null, page, size, flowCode, keyword, true);
+    }
+
+    /** allTenant=true 表示不限办理人（管理视角），否则只取 assignee 的任务。 */
+    private PageResult<TaskView> todo(String userId, int page, int size, String flowCode, String keyword,
+                                      boolean allTenant) {
         String tenantId = TenantContext.require();
-        TaskQuery query = taskService.createTaskQuery().taskTenantId(tenantId).taskAssignee(userId);
+        TaskQuery query = taskService.createTaskQuery().taskTenantId(tenantId);
+        if (!allTenant && userId != null && !userId.isBlank()) {
+            query.taskAssignee(userId);
+        }
         if (flowCode != null && !flowCode.isBlank()) {
             query.processDefinitionKey(compiler.processKeyOf(flowCode));
         }
@@ -94,9 +111,23 @@ public class WorkbenchQueryService {
     }
 
     public PageResult<TaskView> done(String userId, int page, int size, String flowCode, String keyword) {
+        return done(userId, page, size, flowCode, keyword, false);
+    }
+
+    /** 管理视角：本租户全部已办任务，不按办理人过滤，仅按租户隔离。 */
+    public PageResult<TaskView> doneByTenant(int page, int size, String flowCode, String keyword) {
+        return done(null, page, size, flowCode, keyword, true);
+    }
+
+    /** allTenant=true 表示不限办理人（管理视角），否则只取 assignee 的历史任务。 */
+    private PageResult<TaskView> done(String userId, int page, int size, String flowCode, String keyword,
+                                      boolean allTenant) {
         String tenantId = TenantContext.require();
         HistoricTaskInstanceQuery query = historyService.createHistoricTaskInstanceQuery()
-                .taskTenantId(tenantId).taskAssignee(userId).finished();
+                .taskTenantId(tenantId).finished();
+        if (!allTenant && userId != null && !userId.isBlank()) {
+            query.taskAssignee(userId);
+        }
         if (flowCode != null && !flowCode.isBlank()) {
             query.processDefinitionKey(compiler.processKeyOf(flowCode));
         }
@@ -195,12 +226,37 @@ public class WorkbenchQueryService {
         return new WorkbenchCounts(todo, done, submitted, ccUnread);
     }
 
+    /** 管理视角：本租户全量的待办/已办/发起/未读抄送统计，不按个人或租户外过滤。 */
+    public WorkbenchCounts countsByTenant() {
+        String tenantId = TenantContext.require();
+        long todo = taskService.createTaskQuery().taskTenantId(tenantId).count();
+        long done = historyService.createHistoricTaskInstanceQuery()
+                .taskTenantId(tenantId).finished().count();
+        long submitted = instanceMapper.selectCount(null);
+        long ccUnread = ccMapper.selectCount(new LambdaQueryWrapper<BpmCc>()
+                .eq(BpmCc::getReadFlag, 0));
+        return new WorkbenchCounts(todo, done, submitted, ccUnread);
+    }
+
+    /**
+     * 管理视角：本租户全部抄送记录，不按接收人过滤，仅按租户隔离。
+     */
+    public PageResult<CcView> ccByTenant(int page, int size, boolean unreadOnly, String keyword) {
+        return cc(null, page, size, unreadOnly, keyword, true);
+    }
+
     /**
      * 抄送我的：按接收人分页查询，可按关键字（实例标题）与未读过滤。
      */
     public PageResult<CcView> cc(String userId, int page, int size, boolean unreadOnly, String keyword) {
+        return cc(userId, page, size, unreadOnly, keyword, false);
+    }
+
+    /** allTenant=true 表示不限接收人（管理视角），否则只取该接收人的抄送。 */
+    private PageResult<CcView> cc(String userId, int page, int size, boolean unreadOnly, String keyword,
+                                  boolean allTenant) {
         LambdaQueryWrapper<BpmCc> wrapper = new LambdaQueryWrapper<BpmCc>()
-                .eq(BpmCc::getUserId, userId)
+                .eq(!allTenant && userId != null && !userId.isBlank(), BpmCc::getUserId, userId)
                 .eq(unreadOnly, BpmCc::getReadFlag, 0)
                 .orderByDesc(BpmCc::getCreatedAt);
         if (keyword != null && !keyword.isBlank()) {
@@ -229,13 +285,27 @@ public class WorkbenchQueryService {
      * 标记抄送已读。只允许本人操作自己的抄送记录，重复标记幂等。
      */
     public void markCcRead(String id, String userId) {
+        BpmCc cc = requireCc(id);
+        if (!Objects.equals(cc.getUserId(), userId)) {
+            throw new BizException(ErrorCode.FORBIDDEN, "只能标记自己的抄送记录");
+        }
+        markRead(cc);
+    }
+
+    /** 管理视角：标记本租户任意抄送已读，不校验接收人（租户插件保证跨租户隔离）。 */
+    public void markCcReadByTenant(String id) {
+        markRead(requireCc(id));
+    }
+
+    private BpmCc requireCc(String id) {
         BpmCc cc = ccMapper.selectById(id);
         if (cc == null) {
             throw new BizException(ErrorCode.INSTANCE_NOT_FOUND, "抄送记录不存在：" + id);
         }
-        if (!Objects.equals(cc.getUserId(), userId)) {
-            throw new BizException(ErrorCode.FORBIDDEN, "只能标记自己的抄送记录");
-        }
+        return cc;
+    }
+
+    private void markRead(BpmCc cc) {
         if (cc.getReadFlag() != null && cc.getReadFlag() == 1) {
             return;
         }

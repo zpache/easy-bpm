@@ -164,9 +164,9 @@ public class DemoDataInitializer implements ApplicationRunner {
     }
 
     private void seedConsoleUsers(LocalDateTime now) {
+        // 控制台只开放管理员账号；员工（李四/王五等）仅作为组织人员参与审批，
+        // 其身份由业务系统通过 OpenAPI 的 userId 传入，不在中台建可登录账号。
         consoleUser("admin", "admin123", "系统管理员", "u1001", "TENANT_ADMIN", now);
-        consoleUser("lisi", "admin123", "李四", "u1002", "MEMBER", now);
-        consoleUser("wangwu", "admin123", "王五", "u1003", "MEMBER", now);
     }
 
     private void seedFlows() {

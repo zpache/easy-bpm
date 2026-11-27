@@ -58,12 +58,6 @@
           </template>
         </el-table-column>
       </template>
-      <el-table-column v-if="tab === 'todo'" label="操作" width="160" fixed="right">
-        <template #default="{ row }">
-          <el-button size="small" type="success" plain @click.stop="handle(row, 'approve')">同意</el-button>
-          <el-button size="small" type="danger" plain @click.stop="handle(row, 'reject')">驳回</el-button>
-        </template>
-      </el-table-column>
     </el-table>
 
     <TablePagination
@@ -74,13 +68,6 @@
       @change="load"
     />
 
-    <el-dialog v-model="handleVisible" :title="handleAction === 'approve' ? '同意' : '驳回'" width="440px">
-      <el-input v-model="comment" type="textarea" :rows="3" placeholder="审批意见" />
-      <template #footer>
-        <el-button @click="handleVisible = false">取消</el-button>
-        <el-button :type="handleAction === 'approve' ? 'success' : 'danger'" @click="submitHandle">确认</el-button>
-      </template>
-    </el-dialog>
   </el-card>
 </template>
 
@@ -88,9 +75,8 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TablePagination from '@/components/TablePagination.vue'
-import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
-import { approveTask, doneTasks, rejectTask, todoTasks } from '@/api/workbench'
+import { doneTasks, todoTasks } from '@/api/workbench'
 import type { TaskView } from '@/api/types'
 import { actionText, actionType } from '@/utils/labels'
 import { fmtDateTime } from '@/utils/format'
@@ -104,10 +90,6 @@ const page = ref(1)
 const size = ref(20)
 const keyword = ref('')
 const loading = ref(false)
-const handleVisible = ref(false)
-const handleAction = ref<'approve' | 'reject'>('approve')
-const handlingTask = ref<TaskView | null>(null)
-const comment = ref('')
 
 async function load() {
   loading.value = true
@@ -129,26 +111,6 @@ function reload() {
 function onTab(name: number | string) {
   router.replace({ name: name === 'todo' ? 'todo' : 'done' })
   reload()
-}
-
-function handle(row: TaskView, action: 'approve' | 'reject') {
-  handlingTask.value = row
-  handleAction.value = action
-  comment.value = ''
-  handleVisible.value = true
-}
-
-async function submitHandle() {
-  if (!handlingTask.value) return
-  if (handleAction.value === 'approve') {
-    await approveTask(handlingTask.value.taskId, comment.value)
-    ElMessage.success('已同意')
-  } else {
-    await rejectTask(handlingTask.value.taskId, comment.value)
-    ElMessage.success('已驳回')
-  }
-  handleVisible.value = false
-  await load()
 }
 
 function goDetail(instanceId: string) {

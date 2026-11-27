@@ -21,11 +21,11 @@ export const router = createRouter({
         { path: 'flows', name: 'flows', component: () => import('@/views/flows/FlowList.vue'), meta: { title: '流程定义' } },
         { path: 'flows/:code/versions', name: 'flow-versions', component: () => import('@/views/flows/FlowVersions.vue'), meta: { title: '版本历史' } },
         { path: 'flows/:code/design', name: 'flow-design', component: () => import('@/views/flows/FlowDesigner.vue'), meta: { title: '审批流程设计' } },
-        { path: 'workbench/todo', name: 'todo', component: () => import('@/views/workbench/TaskList.vue'), meta: { title: '待办', tab: 'todo' } },
-        { path: 'workbench/done', name: 'done', component: () => import('@/views/workbench/TaskList.vue'), meta: { title: '已办', tab: 'done' } },
-        { path: 'workbench/submitted', name: 'submitted', component: () => import('@/views/workbench/SubmittedList.vue'), meta: { title: '我发起的' } },
-        { path: 'workbench/cc', name: 'cc', component: () => import('@/views/workbench/CcList.vue'), meta: { title: '抄送我的' } },
-        { path: 'workbench/all-instances', name: 'all-instances', component: () => import('@/views/workbench/InstancesAdmin.vue'), meta: { title: '全部实例', requiresAdmin: true } },
+        { path: 'workbench/todo', name: 'todo', component: () => import('@/views/workbench/TaskList.vue'), meta: { title: '待办', tab: 'todo', requiresTenantView: true } },
+        { path: 'workbench/done', name: 'done', component: () => import('@/views/workbench/TaskList.vue'), meta: { title: '已办', tab: 'done', requiresTenantView: true } },
+        { path: 'workbench/submitted', name: 'submitted', component: () => import('@/views/workbench/SubmittedList.vue'), meta: { title: '我发起的', requiresTenantView: true } },
+        { path: 'workbench/cc', name: 'cc', component: () => import('@/views/workbench/CcList.vue'), meta: { title: '抄送我的', requiresTenantView: true } },
+        { path: 'workbench/all-instances', name: 'all-instances', component: () => import('@/views/workbench/InstancesAdmin.vue'), meta: { title: '全部实例', requiresTenantView: true } },
         { path: 'instances/:instanceId', name: 'instance-detail', component: () => import('@/views/workbench/InstanceDetail.vue'), meta: { title: '审批详情' } },
         { path: 'org', name: 'org', component: () => import('@/views/Org.vue'), meta: { title: '组织管理', requiresAdmin: true } },
         { path: 'tenant', name: 'tenant', component: () => import('@/views/Tenant.vue'), meta: { title: '租户凭证', requiresAdmin: true } },
@@ -48,6 +48,11 @@ router.beforeEach((to) => {
     return { name: 'dashboard' }
   }
   if (to.matched.some((r) => r.meta.requiresAdmin) && !auth.isTenantAdmin) {
+    return { name: 'dashboard' }
+  }
+  // 工作台为租户管理视角：纯平台管理员（未切换进租户）不可访问
+  if (to.matched.some((r) => r.meta.requiresTenantView)
+      && !(auth.isTenantAdmin && (!auth.isPlatformAdmin || !!auth.switchedTenant))) {
     return { name: 'dashboard' }
   }
   if (to.matched.some((r) => r.meta.requiresPlatformAdmin) && !auth.isPlatformAdmin) {

@@ -49,14 +49,6 @@ export function instanceDetail(instanceId: string) {
   return http.get<never, InstanceDetail>(`/workbench/instances/${instanceId}`)
 }
 
-export function approveTask(taskId: string, comment: string) {
-  return http.post<never, unknown>(`/workbench/tasks/${taskId}/approve`, { comment })
-}
-
-export function rejectTask(taskId: string, comment: string) {
-  return http.post<never, unknown>(`/workbench/tasks/${taskId}/reject`, { comment })
-}
-
 export function dashboardSummary() {
   return http.get<never, Record<string, number>>('/dashboard/summary')
 }

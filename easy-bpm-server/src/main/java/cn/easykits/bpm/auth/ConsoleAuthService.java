@@ -42,6 +42,11 @@ public class ConsoleAuthService {
         if (!"ACTIVE".equals(user.getStatus())) {
             throw new BizException(ErrorCode.FORBIDDEN, "账号已停用");
         }
+        // 控制台管理员账号只开放两类角色：租户管理员、平台管理员。
+        // 员工身份由接入方业务系统持有，通过 OpenAPI 以 userId 传入，不在中台建可登录账号。
+        if (!"TENANT_ADMIN".equals(user.getRole()) && !"PLATFORM_ADMIN".equals(user.getRole())) {
+            throw new BizException(ErrorCode.FORBIDDEN, "该账号无控制台登录权限，员工请在业务系统访问审批");
+        }
 
         LocalDateTime now = LocalDateTime.now();
         ConsoleUser update = new ConsoleUser();

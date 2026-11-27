@@ -24,26 +24,28 @@
           <el-icon><Share /></el-icon>
           <template #title>流程定义</template>
         </el-menu-item>
-        <el-menu-item index="/workbench/todo">
-          <el-icon><Tickets /></el-icon>
-          <template #title>待办任务</template>
-        </el-menu-item>
-        <el-menu-item index="/workbench/done">
-          <el-icon><Finished /></el-icon>
-          <template #title>已办任务</template>
-        </el-menu-item>
-        <el-menu-item index="/workbench/submitted">
-          <el-icon><Promotion /></el-icon>
-          <template #title>我发起的</template>
-        </el-menu-item>
-        <el-menu-item index="/workbench/cc">
-          <el-icon><Message /></el-icon>
-          <template #title>抄送我的</template>
-        </el-menu-item>
-        <el-menu-item v-if="auth.isTenantAdmin" index="/workbench/all-instances">
-          <el-icon><Files /></el-icon>
-          <template #title>全部实例</template>
-        </el-menu-item>
+        <template v-if="showWorkbench">
+          <el-menu-item index="/workbench/todo">
+            <el-icon><Tickets /></el-icon>
+            <template #title>待办任务</template>
+          </el-menu-item>
+          <el-menu-item index="/workbench/done">
+            <el-icon><Finished /></el-icon>
+            <template #title>已办任务</template>
+          </el-menu-item>
+          <el-menu-item index="/workbench/submitted">
+            <el-icon><Promotion /></el-icon>
+            <template #title>我发起的</template>
+          </el-menu-item>
+          <el-menu-item index="/workbench/cc">
+            <el-icon><Message /></el-icon>
+            <template #title>抄送我的</template>
+          </el-menu-item>
+          <el-menu-item index="/workbench/all-instances">
+            <el-icon><Files /></el-icon>
+            <template #title>全部实例</template>
+          </el-menu-item>
+        </template>
         <template v-if="auth.isTenantAdmin">
           <el-menu-item index="/org">
             <el-icon><OfficeBuilding /></el-icon>
@@ -160,6 +162,13 @@ const activeMenu = computed(() => {
 })
 const pageTitle = computed(() => (route.meta.title as string) || '')
 const avatarChar = computed(() => (auth.user?.name || auth.user?.username || 'U').slice(0, 1).toUpperCase())
+
+/**
+ * 工作台菜单面向租户管理视角：租户管理员可见；
+ * 平台管理员仅在「切换进入某租户」后可见（此时 role 仍是 PLATFORM_ADMIN，但带 switchedTenant）。
+ * 纯平台管理视角不显示这 4 个租户任务菜单。
+ */
+const showWorkbench = computed(() => auth.isTenantAdmin && (!auth.isPlatformAdmin || !!auth.switchedTenant))
 
 async function onLogout() {
   await auth.logout()
