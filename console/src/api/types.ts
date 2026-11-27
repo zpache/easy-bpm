@@ -54,6 +54,8 @@ export interface TaskView {
   flowCode?: string
   flowName?: string
   initiatorName?: string
+  sourceAppKey?: string
+  sourceAppName?: string
   status: 'PENDING' | 'FINISHED'
   action?: string
   createdAt?: string
@@ -110,6 +112,8 @@ export interface CcView {
   flowCode?: string
   flowName?: string
   initiatorName?: string
+  sourceAppKey?: string
+  sourceAppName?: string
   instanceStatus?: string
   read: boolean
   createdAt?: string

@@ -18,6 +18,14 @@
         </template>
       </el-table-column>
       <el-table-column prop="flowName" label="流程" width="150" />
+      <el-table-column label="来源应用" width="130" show-overflow-tooltip>
+        <template #default="{ row }">
+          <el-tag v-if="row.sourceAppName || row.sourceAppKey" size="small" type="info" effect="plain">
+            {{ row.sourceAppName || row.sourceAppKey }}
+          </el-tag>
+          <span v-else class="muted">-</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="businessKey" label="业务主键" width="140" />
       <el-table-column prop="status" label="状态" width="100">
         <template #default="{ row }">
@@ -91,4 +99,5 @@ onMounted(load)
 
 <style scoped>
 .toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
+.muted { color: #a8abb2; }
 </style>

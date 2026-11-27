@@ -36,6 +36,14 @@
         </template>
       </el-table-column>
       <el-table-column prop="flowName" label="流程" width="150" show-overflow-tooltip />
+      <el-table-column label="来源应用" width="130" show-overflow-tooltip>
+        <template #default="{ row }">
+          <el-tag v-if="row.sourceAppName || row.sourceAppKey" size="small" type="info" effect="plain">
+            {{ row.sourceAppName || row.sourceAppKey }}
+          </el-tag>
+          <span v-else class="muted">-</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="nodeName" label="抄送节点" width="140" show-overflow-tooltip />
       <el-table-column prop="initiatorName" label="发起人" width="100" />
       <el-table-column label="实例状态" width="100">
@@ -170,6 +178,7 @@ onMounted(() => {
   font-size: 11px;
   text-align: center;
 }
+.muted { color: #a8abb2; }
 .title-cell { display: inline-flex; align-items: center; gap: 6px; }
 .title-cell.unread { font-weight: 600; color: #303133; }
 .unread-dot {

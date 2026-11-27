@@ -16,6 +16,8 @@ public record TaskView(
         String flowCode,
         String flowName,
         String initiatorName,
+        String sourceAppKey,
+        String sourceAppName,
         String status,
         String action,
         LocalDateTime createdAt,

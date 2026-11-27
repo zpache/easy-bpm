@@ -14,6 +14,8 @@ public record CcView(
         String flowCode,
         String flowName,
         String initiatorName,
+        String sourceAppKey,
+        String sourceAppName,
         String instanceStatus,
         boolean read,
         LocalDateTime createdAt

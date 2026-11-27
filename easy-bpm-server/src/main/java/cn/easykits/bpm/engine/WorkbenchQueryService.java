@@ -192,6 +192,8 @@ public class WorkbenchQueryService {
                         flowCodeOf(instances.get(task.getProcessInstanceId())),
                         flowNameOf(instances.get(task.getProcessInstanceId())),
                         initiatorOf(instances.get(task.getProcessInstanceId())),
+                        sourceAppKeyOf(instances.get(task.getProcessInstanceId())),
+                        sourceAppNameOf(instances.get(task.getProcessInstanceId())),
                         "FINISHED",
                         actions.get(task.getId()),
                         toLocal(task.getCreateTime()),
@@ -376,6 +378,7 @@ public class WorkbenchQueryService {
     private CcView toCcView(BpmCc cc, BpmInstance instance) {
         return new CcView(cc.getId(), cc.getInstanceId(), cc.getNodeId(), cc.getNodeName(),
                 titleOf(instance), flowCodeOf(instance), flowNameOf(instance), initiatorOf(instance),
+                sourceAppKeyOf(instance), sourceAppNameOf(instance),
                 instance == null ? null : instance.getStatus(),
                 cc.getReadFlag() != null && cc.getReadFlag() == 1,
                 cc.getCreatedAt());
@@ -460,6 +463,7 @@ public class WorkbenchQueryService {
                 task.getName(), task.getAssignee(),
                 names.getOrDefault(task.getAssignee(), task.getAssignee()),
                 titleOf(instance), flowCodeOf(instance), flowNameOf(instance), initiatorOf(instance),
+                sourceAppKeyOf(instance), sourceAppNameOf(instance),
                 "PENDING", action, toLocal(task.getCreateTime()), null);
     }
 
@@ -549,6 +553,14 @@ public class WorkbenchQueryService {
 
     private String initiatorOf(BpmInstance instance) {
         return instance == null ? null : instance.getInitiatorName();
+    }
+
+    private String sourceAppKeyOf(BpmInstance instance) {
+        return instance == null ? null : instance.getSourceAppKey();
+    }
+
+    private String sourceAppNameOf(BpmInstance instance) {
+        return instance == null ? null : instance.getSourceAppName();
     }
 
     private LocalDateTime toLocal(java.util.Date date) {

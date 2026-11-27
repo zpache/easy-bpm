@@ -31,6 +31,14 @@
       <el-table-column prop="flowName" label="流程" width="150" show-overflow-tooltip>
         <template #default="{ row }">{{ row.flowName || '-' }}</template>
       </el-table-column>
+      <el-table-column label="来源应用" width="130" show-overflow-tooltip>
+        <template #default="{ row }">
+          <el-tag v-if="row.sourceAppName || row.sourceAppKey" size="small" type="info" effect="plain">
+            {{ row.sourceAppName || row.sourceAppKey }}
+          </el-tag>
+          <span v-else class="muted">-</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="nodeName" label="节点" width="130" show-overflow-tooltip />
       <el-table-column prop="initiatorName" label="发起人" width="100">
         <template #default="{ row }">{{ row.initiatorName || '-' }}</template>

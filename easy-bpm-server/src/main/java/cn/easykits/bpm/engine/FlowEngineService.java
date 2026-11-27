@@ -636,6 +636,8 @@ public class FlowEngineService {
                 projection == null ? null : projection.getFlowCode(),
                 projection == null ? null : projection.getFlowName(),
                 projection == null ? null : projection.getInitiatorName(),
+                projection == null ? null : projection.getSourceAppKey(),
+                projection == null ? null : projection.getSourceAppName(),
                 "PENDING", null, task.getCreateTime() == null ? null
                 : LocalDateTime.ofInstant(task.getCreateTime().toInstant(), java.time.ZoneId.systemDefault()),
                 null);
