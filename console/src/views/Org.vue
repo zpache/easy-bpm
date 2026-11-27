@@ -122,7 +122,7 @@
     <el-dialog v-model="userVisible" :title="editingUserCode ? '编辑人员' : '新增人员'" width="540px" :close-on-click-modal="false">
       <el-form ref="userFormRef" :model="userForm" :rules="userRules" label-width="90px">
         <el-form-item label="人员编码" prop="userCode">
-          <el-input v-model="userForm.userCode" :disabled="!!editingUserCode" placeholder="全局唯一，创建后不可改" maxlength="64" />
+          <el-input v-model="userForm.userCode" :disabled="!!editingUserCode" placeholder="留空自动生成（U 前缀），创建后不可改" maxlength="64" />
         </el-form-item>
         <el-form-item label="姓名" prop="name">
           <el-input v-model="userForm.name" maxlength="64" />
@@ -260,7 +260,8 @@ const userForm = reactive({
 })
 const userFormRef = ref<FormInstance>()
 const userRules: FormRules = {
-  userCode: requiredTextRules('人员编码', 64),
+  // 新增时人员编码可留空由后端自动生成（U 前缀），手动填写仅校验长度
+  userCode: [{ max: 64, message: '人员编码不能超过64个字符', trigger: 'blur' }],
   name: requiredTextRules('姓名', 64),
   roleCodes: [{
     validator: (_rule, roleCodes: string[], callback) => {

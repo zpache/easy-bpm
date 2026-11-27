@@ -7,7 +7,10 @@ import cn.easykits.bpm.common.crypto.DataCipher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -37,6 +40,24 @@ public class OrgService {
     /** 手机号盲索引：用于「按手机号精确查找」，明文与密文都不参与条件匹配。 */
     public String mobileIndex(String mobile) {
         return cipher.blindIndex(mobile);
+    }
+
+    /**
+     * 生成控制台手动创建人员的编码：保留前缀 U + 日期 + 4 位随机（如 U202611271234）。
+     *
+     * <p>U 前缀为系统保留段，避免与外部系统 /org/sync 同步进来的编码撞码
+     * （撞码会导致 sync 覆盖人工建档资料）。冲突时最多重试 5 次。
+     */
+    public String generateUserCode() {
+        String date = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+        SecureRandom random = new SecureRandom();
+        for (int i = 0; i < 5; i++) {
+            String candidate = "U" + date + String.format("%04d", random.nextInt(10000));
+            if (findUser(candidate) == null) {
+                return candidate;
+            }
+        }
+        throw BizException.badRequest("生成人员编码失败，请手动指定编码后重试");
     }
 
     public OrgUser findUser(String userCode) {

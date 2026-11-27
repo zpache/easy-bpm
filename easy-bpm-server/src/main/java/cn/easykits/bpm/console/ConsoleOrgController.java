@@ -155,7 +155,10 @@ public class ConsoleOrgController {
     public ApiResponse<Void> saveUser(@Valid @RequestBody SaveUserRequest request) {
         requireAdmin();
         OrgUser user = new OrgUser();
-        user.setUserCode(request.userCode().trim());
+        // 编码留空时自动生成保留前缀 U（外部 /org/sync 的编码不受影响，也不会与之撞码）；
+        // 手动填写仍允许，便于提前预留与外部系统一致的编码
+        user.setUserCode(request.userCode() == null || request.userCode().isBlank()
+                ? orgService.generateUserCode() : request.userCode().trim());
         user.setName(request.name().trim());
         user.setDeptCode(blankToNull(request.deptCode()));
         user.setDeptName(resolveDeptName(user.getDeptCode()));
@@ -261,7 +264,6 @@ public class ConsoleOrgController {
     }
 
     public record SaveUserRequest(
-            @NotBlank(message = "人员编码不能为空或仅含空格")
             @Size(max = 64, message = "人员编码不能超过64个字符") String userCode,
             @NotBlank(message = "姓名不能为空或仅含空格")
             @Size(max = 64, message = "姓名不能超过64个字符") String name, String deptCode,
