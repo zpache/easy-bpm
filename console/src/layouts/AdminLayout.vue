@@ -3,7 +3,7 @@
     <el-aside :width="collapsed ? '64px' : '210px'" class="aside">
       <div class="brand" @click="router.push('/dashboard')">
         <img class="brand-logo" :src="easyBpmLogo" alt="easy-bpm" width="32" height="32" />
-        <span v-show="!collapsed" class="brand-name">easy-bpm</span>
+        <span v-show="!collapsed" class="brand-name">审批流中台系统</span>
       </div>
       <el-menu
         :default-active="activeMenu"

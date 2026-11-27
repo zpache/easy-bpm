@@ -5,7 +5,7 @@
       <div class="brand-side">
         <div class="brand-inner">
           <img class="brand-logo" :src="easyBpmLogo" alt="easy-bpm" width="52" height="52" />
-          <h1 class="brand-title">easy-bpm</h1>
+          <h1 class="brand-title">审批流中台系统</h1>
           <p class="brand-sub">轻量级审批流平台 · 快速接入 ERP / SaaS</p>
           <div class="brand-features">
             <div class="feature-item"><span class="dot" />业务表单零设计，数据归业务系统，变更零同步</div>
