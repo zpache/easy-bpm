@@ -63,6 +63,24 @@ public class OrgService {
         throw BizException.badRequest("生成人员编码失败，请手动指定编码后重试");
     }
 
+    /**
+     * 生成控制台手动创建部门的编码：保留前缀 D + 日期 + 4 位随机（如 D202611270034）。
+     *
+     * <p>D 前缀为系统保留段，避免与外部系统 /org/sync 同步进来的编码撞码；
+     * 冲突时最多重试 5 次。
+     */
+    public String generateDeptCode() {
+        String date = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+        SecureRandom random = new SecureRandom();
+        for (int i = 0; i < 5; i++) {
+            String candidate = "D" + date + String.format("%04d", random.nextInt(10000));
+            if (findDept(candidate) == null) {
+                return candidate;
+            }
+        }
+        throw BizException.badRequest("生成部门编码失败，请手动指定编码后重试");
+    }
+
     public OrgUser findUser(String userCode) {
         if (userCode == null || userCode.isBlank()) {
             return null;

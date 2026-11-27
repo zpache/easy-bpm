@@ -194,7 +194,7 @@
     <el-dialog v-model="deptVisible" :title="editingDeptCode ? '编辑部门' : '新增部门'" width="480px" :close-on-click-modal="false">
       <el-form ref="deptFormRef" :model="deptForm" :rules="deptRules" label-width="90px">
         <el-form-item label="部门编码" prop="deptCode">
-          <el-input v-model="deptForm.deptCode" :disabled="!!editingDeptCode" placeholder="全局唯一，创建后不可改" maxlength="64" />
+          <el-input v-model="deptForm.deptCode" :disabled="!!editingDeptCode" placeholder="留空自动生成（D 前缀），创建后不可改" maxlength="64" />
         </el-form-item>
         <el-form-item label="部门名称" prop="name">
           <el-input v-model="deptForm.name" maxlength="128" />
@@ -306,7 +306,8 @@ const editingDeptCode = ref('')
 const deptForm = reactive({ deptCode: '', name: '', parentCode: '', leaderId: '', sortNo: 0 })
 const deptFormRef = ref<FormInstance>()
 const deptRules: FormRules = {
-  deptCode: requiredTextRules('部门编码', 64),
+  // 新增时部门编码可留空由后端自动生成（D 前缀），手动填写仅校验长度
+  deptCode: [{ max: 64, message: '部门编码不能超过64个字符', trigger: 'blur' }],
   name: requiredTextRules('部门名称', 128),
 }
 
@@ -474,6 +475,7 @@ async function onDeleteUser(row: OrgUserView) {
 // ---------- 部门 ----------
 function openDeptDialog(row?: OrgDeptView) {
   editingDeptCode.value = row?.deptCode || ''
+  // 新增时清空上次表单残留，编码留空由后端自动生成
   deptForm.deptCode = row?.deptCode || ''
   deptForm.name = row?.name || ''
   deptForm.parentCode = row?.parentCode || ''

@@ -139,7 +139,10 @@ public class ConsoleOrgController {
     public ApiResponse<Void> saveDept(@Valid @RequestBody SaveDeptRequest request) {
         requireAdmin();
         OrgDept dept = new OrgDept();
-        dept.setDeptCode(request.deptCode().trim());
+        // 编码留空时自动生成保留前缀 D（外部 /org/sync 的编码不受影响，也不会与之撞码）；
+        // 手动填写仍允许，便于提前预留与外部系统一致的编码
+        dept.setDeptCode(request.deptCode() == null || request.deptCode().isBlank()
+                ? orgService.generateDeptCode() : request.deptCode().trim());
         dept.setName(request.name().trim());
         dept.setParentCode(blankToNull(request.parentCode()));
         dept.setLeaderId(blankToNull(request.leaderId()));
@@ -275,7 +278,6 @@ public class ConsoleOrgController {
     }
 
     public record SaveDeptRequest(
-            @NotBlank(message = "部门编码不能为空或仅含空格")
             @Size(max = 64, message = "部门编码不能超过64个字符") String deptCode,
             @NotBlank(message = "部门名称不能为空或仅含空格")
             @Size(max = 128, message = "部门名称不能超过128个字符") String name,
