@@ -1,10 +1,7 @@
 <template>
   <el-card>
     <div class="toolbar">
-      <el-tabs v-model="tab" class="toolbar-tabs" @tab-change="onTab">
-        <el-tab-pane label="待办" name="todo" />
-        <el-tab-pane label="已办" name="done" />
-      </el-tabs>
+      <div class="toolbar-title">{{ tab === 'todo' ? '待办任务' : '已办任务' }}</div>
       <div class="toolbar-right">
         <el-input
           v-model="keyword"
@@ -72,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TablePagination from '@/components/TablePagination.vue'
 import { Search } from '@element-plus/icons-vue'
@@ -83,7 +80,8 @@ import { fmtDateTime } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
-const tab = ref((route.meta.tab as string) || 'todo')
+// tab 完全由路由决定（待办/已办是两个独立菜单），不再在页面内互切
+const tab = computed(() => (route.meta.tab as string) || 'todo')
 const tasks = ref<TaskView[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -108,11 +106,6 @@ function reload() {
   load()
 }
 
-function onTab(name: number | string) {
-  router.replace({ name: name === 'todo' ? 'todo' : 'done' })
-  reload()
-}
-
 function goDetail(instanceId: string) {
   router.push({ name: 'instance-detail', params: { instanceId } })
 }
@@ -133,6 +126,13 @@ function duration(start?: string, end?: string) {
   return `${Math.floor(hours / 24)} 天 ${hours % 24} 小时`
 }
 
+// 待办/已办两条路由复用本组件，切换菜单时实例不重建，需监听 tab 变化重新取数
+watch(tab, () => {
+  page.value = 1
+  keyword.value = ''
+  load()
+})
+
 onMounted(load)
 </script>
 
@@ -145,7 +145,7 @@ onMounted(load)
   border-bottom: 1px solid #ebeef5;
   margin-bottom: 12px;
 }
-.toolbar-tabs :deep(.el-tabs__header) { margin-bottom: 0; }
+.toolbar-title { font-size: 16px; font-weight: 600; padding-bottom: 8px; }
 .toolbar-right { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; }
 .muted { color: #a8abb2; }
 :deep(.el-table__row) { cursor: pointer; }
