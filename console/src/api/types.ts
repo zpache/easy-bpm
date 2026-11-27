@@ -138,6 +138,7 @@ export interface OrgUserView {
 
 export interface OrgRoleView {
   roleCode: string
+  roleName: string
   userCount: number
 }
 

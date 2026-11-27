@@ -71,8 +71,8 @@
       <!-- 部门 -->
       <el-tab-pane label="部门" name="depts">
         <div class="toolbar">
-          <span class="tab-tip">部门主管会自动作为部门内未单独设置主管的人员的直属主管（本部门未设则沿上级部门向上查找）；「直属主管 / 部门主管」类型审批节点均按此解析</span>
           <el-button type="primary" @click="openDeptDialog()">新增部门</el-button>
+          <span class="tab-tip">部门主管会自动作为部门内未单独设置主管的人员的直属主管（本部门未设则沿上级部门向上查找）；「直属主管 / 部门主管」类型审批节点均按此解析</span>
         </div>
         <el-table :data="depts" v-loading="deptsLoading">
           <template #empty><el-empty description="暂无部门数据" :image-size="80" /></template>
@@ -102,16 +102,23 @@
       <!-- 角色 -->
       <el-tab-pane label="角色" name="roles">
         <div class="toolbar">
+          <el-button type="primary" @click="openRoleDialog()">新增角色</el-button>
           <span class="tab-tip">角色用于「指定角色」审批节点；为角色分配或移除人员会实时影响后续审批人解析</span>
-          <span />
         </div>
         <el-table :data="roles" v-loading="rolesLoading">
-          <template #empty><el-empty description="暂无角色，可在人员编辑中创建角色并授权" :image-size="80" /></template>
-          <el-table-column prop="roleCode" label="角色编码" min-width="200" />
-          <el-table-column prop="userCount" label="授权人数" width="120" />
-          <el-table-column label="操作" width="120" fixed="right">
+          <template #empty><el-empty description="暂无角色，点击左上角「新增角色」创建" :image-size="80" /></template>
+          <el-table-column prop="roleCode" label="角色编码" min-width="160" />
+          <el-table-column prop="roleName" label="角色名称" min-width="160">
+            <template #default="{ row }">{{ row.roleName || row.roleCode }}</template>
+          </el-table-column>
+          <el-table-column prop="userCount" label="授权人数" width="100" />
+          <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" @click="openAssignDialog(row)">分配人员</el-button>
+              <el-button link type="primary" @click="openRoleDialog(row)">编辑</el-button>
+              <el-popconfirm :title="`删除将同时解除 ${row.userCount} 人的授权，确认？`" width="240" @confirm="onDeleteRole(row)">
+                <template #reference><el-button link type="danger">删除</el-button></template>
+              </el-popconfirm>
             </template>
           </el-table-column>
         </el-table>
@@ -157,13 +164,29 @@
         <el-form-item label="角色" prop="roleCodes">
           <el-select v-model="userForm.roleCodes" multiple filterable
                      placeholder="选择角色编码（新角色请在角色页签创建）" style="width: 100%">
-            <el-option v-for="r in roles" :key="r.roleCode" :label="`${r.roleCode}(${r.userCount}人)`" :value="r.roleCode" />
+            <el-option v-for="r in roles" :key="r.roleCode" :label="`${r.roleName || r.roleCode}（${r.userCount}人）`" :value="r.roleCode" />
           </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="userVisible = false">取消</el-button>
         <el-button type="primary" :loading="saving" @click="onSaveUser">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 角色编辑 -->
+    <el-dialog v-model="roleVisible" :title="editingRoleCode ? '编辑角色' : '新增角色'" width="460px" :close-on-click-modal="false">
+      <el-form ref="roleFormRef" :model="roleForm" :rules="roleRules" label-width="90px">
+        <el-form-item label="角色编码" prop="roleCode">
+          <el-input v-model="roleForm.roleCode" :disabled="!!editingRoleCode" placeholder="全局唯一，创建后不可改" maxlength="64" />
+        </el-form-item>
+        <el-form-item label="角色名称" prop="roleName">
+          <el-input v-model="roleForm.roleName" placeholder="展示用名称，如：财务审批员" maxlength="64" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="roleVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="onSaveRole">保存</el-button>
       </template>
     </el-dialog>
 
@@ -227,12 +250,14 @@ import { Search } from '@element-plus/icons-vue'
 import {
   assignRole,
   deleteDept,
+  deleteRole,
   deleteUser,
   orgDepts,
   orgRoleUsers,
   orgRoles,
   orgUsers,
   saveDept,
+  saveRole,
   saveUser,
 } from '@/api/org'
 import type { OrgDeptView, OrgRoleView, OrgUserView } from '@/api/types'
@@ -290,6 +315,16 @@ const assignVisible = ref(false)
 const assignForm = reactive({ roleCode: '', userCodes: [] as string[] })
 const assignFormRef = ref<FormInstance>()
 const assignRules: FormRules = { roleCode: requiredTextRules('角色编码', 64) }
+
+// 角色编辑（roleCode 为关联键不可改，roleName 展示用可改名）
+const roleVisible = ref(false)
+const editingRoleCode = ref('')
+const roleForm = reactive({ roleCode: '', roleName: '' })
+const roleFormRef = ref<FormInstance>()
+const roleRules: FormRules = {
+  roleCode: requiredTextRules('角色编码', 64),
+  roleName: requiredTextRules('角色名称', 64),
+}
 
 function requiredTextRules(label: string, max: number): FormItemRule[] {
   return [
@@ -471,6 +506,35 @@ async function onDeleteDept(row: OrgDeptView) {
   await deleteDept(row.deptCode)
   ElMessage.success('已删除')
   await loadDepts()
+}
+
+// ---------- 角色 ----------
+function openRoleDialog(row?: OrgRoleView) {
+  editingRoleCode.value = row?.roleCode || ''
+  roleForm.roleCode = row?.roleCode || ''
+  // 历史数据可能无定义（roleName 为空时后端以 roleCode 兜底展示），编辑时回填展示值
+  roleForm.roleName = row ? (row.roleName || row.roleCode) : ''
+  roleVisible.value = true
+  nextTick(() => roleFormRef.value?.clearValidate())
+}
+
+async function onSaveRole() {
+  if (!await roleFormRef.value?.validate().catch(() => false)) return
+  saving.value = true
+  try {
+    await saveRole({ roleCode: roleForm.roleCode.trim(), roleName: roleForm.roleName.trim() })
+    roleVisible.value = false
+    ElMessage.success('已保存')
+    await Promise.all([loadRoles(), loadUsers()])
+  } finally {
+    saving.value = false
+  }
+}
+
+async function onDeleteRole(row: OrgRoleView) {
+  await deleteRole(row.roleCode)
+  ElMessage.success('已删除')
+  await Promise.all([loadRoles(), loadUsers()])
 }
 
 // ---------- 角色分配 ----------

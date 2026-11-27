@@ -103,12 +103,28 @@ public class ConsoleOrgController {
 
     @GetMapping("/roles")
     public ApiResponse<List<RoleView>> roles() {
-        List<OrgUserRole> all = roleMapper.selectList(null);
-        Map<String, Long> counts = new LinkedHashMap<>();
-        all.forEach(r -> counts.merge(r.getRoleCode(), 1L, Long::sum));
-        return ApiResponse.ok(counts.entrySet().stream()
-                .map(e -> new RoleView(e.getKey(), e.getValue().intValue()))
+        return ApiResponse.ok(orgService.listRoles().values().stream()
+                .map(r -> new RoleView(r.roleCode(), r.roleName(), r.userCount()))
                 .toList());
+    }
+
+    /** 新建或更新角色定义（roleCode 为键；同一编码再次提交视为改名）。 */
+    @PostMapping("/roles")
+    public ApiResponse<Void> saveRole(@Valid @RequestBody SaveRoleRequest request) {
+        requireAdmin();
+        orgService.upsertRole(request.roleCode(), request.roleName());
+        audit.record("ROLE_SAVE", "ROLE", request.roleCode().trim(),
+                "保存角色「" + request.roleName().trim() + "」(" + request.roleCode().trim() + ")");
+        return ApiResponse.ok();
+    }
+
+    /** 删除角色定义并解除全部人员授权。 */
+    @DeleteMapping("/roles/{roleCode}")
+    public ApiResponse<Void> deleteRole(@PathVariable String roleCode) {
+        requireAdmin();
+        int removed = orgService.deleteRole(roleCode);
+        audit.record("ROLE_DELETE", "ROLE", roleCode, "删除角色 (" + roleCode + ")，解除 " + removed + " 人授权");
+        return ApiResponse.ok();
     }
 
     @GetMapping("/roles/{roleCode}/users")
@@ -293,6 +309,13 @@ public class ConsoleOrgController {
                            String status, List<String> roleCodes, LocalDateTime updatedAt) {
     }
 
-    public record RoleView(String roleCode, int userCount) {
+    public record RoleView(String roleCode, String roleName, int userCount) {
+    }
+
+    public record SaveRoleRequest(
+            @NotBlank(message = "角色编码不能为空或仅含空格")
+            @Size(max = 64, message = "角色编码不能超过64个字符") String roleCode,
+            @NotBlank(message = "角色名称不能为空或仅含空格")
+            @Size(max = 64, message = "角色名称不能超过64个字符") String roleName) {
     }
 }

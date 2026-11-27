@@ -62,6 +62,14 @@ export function orgRoleUsers(roleCode: string) {
   return http.get<never, string[]>(`/org/roles/${roleCode}/users`)
 }
 
+export function saveRole(payload: { roleCode: string; roleName: string }) {
+  return http.post<never, void>('/org/roles', payload)
+}
+
+export function deleteRole(roleCode: string) {
+  return http.delete<never, void>(`/org/roles/${roleCode}`)
+}
+
 export interface RoleAssignResult {
   added: number
   removed: number

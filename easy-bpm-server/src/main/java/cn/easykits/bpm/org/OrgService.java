@@ -28,13 +28,15 @@ public class OrgService {
     private final OrgUserMapper userMapper;
     private final OrgDeptMapper deptMapper;
     private final OrgUserRoleMapper roleMapper;
+    private final OrgRoleMapper roleDefinitionMapper;
     private final DataCipher cipher;
 
     public OrgService(OrgUserMapper userMapper, OrgDeptMapper deptMapper, OrgUserRoleMapper roleMapper,
-                      DataCipher cipher) {
+                      OrgRoleMapper roleDefinitionMapper, DataCipher cipher) {
         this.userMapper = userMapper;
         this.deptMapper = deptMapper;
         this.roleMapper = roleMapper;
+        this.roleDefinitionMapper = roleDefinitionMapper;
         this.cipher = cipher;
     }
 
@@ -147,6 +149,65 @@ public class OrgService {
                         .in(OrgUserRole::getUserCode, userCodes))
                 .stream().collect(Collectors.groupingBy(OrgUserRole::getUserCode,
                         Collectors.mapping(OrgUserRole::getRoleCode, Collectors.toList())));
+    }
+
+    /**
+     * 角色列表：定义表（bpm_org_role）与授权关系（bpm_org_user_role）合并。
+     * 定义缺失但已有授权的角色（历史数据 / OpenAPI 同步产生）以 roleCode 兜底展示，编辑保存后即补全定义。
+     */
+    public Map<String, RoleDefinition> listRoles() {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        roleMapper.selectList(null).forEach(r -> counts.merge(r.getRoleCode(), 1L, Long::sum));
+        Map<String, RoleDefinition> result = new LinkedHashMap<>();
+        for (OrgRole def : roleDefinitionMapper.selectList(new LambdaQueryWrapper<OrgRole>()
+                .orderByDesc(OrgRole::getUpdatedAt))) {
+            result.put(def.getRoleCode(), new RoleDefinition(def.getRoleCode(), def.getRoleName(),
+                    counts.getOrDefault(def.getRoleCode(), 0L).intValue()));
+        }
+        for (Map.Entry<String, Long> e : counts.entrySet()) {
+            result.putIfAbsent(e.getKey(), new RoleDefinition(e.getKey(), e.getKey(), e.getValue().intValue()));
+        }
+        return result;
+    }
+
+    /** 新建或更新角色定义（roleCode 为键，roleName 可改名）。 */
+    @Transactional
+    public void upsertRole(String roleCode, String roleName) {
+        if (roleCode == null || roleCode.isBlank()) {
+            throw BizException.badRequest("角色编码不能为空");
+        }
+        if (roleName == null || roleName.isBlank()) {
+            throw BizException.badRequest("角色名称不能为空");
+        }
+        OrgRole existing = roleDefinitionMapper.selectOne(new LambdaQueryWrapper<OrgRole>()
+                .eq(OrgRole::getRoleCode, roleCode));
+        LocalDateTime now = LocalDateTime.now();
+        if (existing == null) {
+            OrgRole role = new OrgRole();
+            role.setId(Ids.id());
+            role.setRoleCode(roleCode.trim());
+            role.setRoleName(roleName.trim());
+            role.setCreatedAt(now);
+            role.setUpdatedAt(now);
+            roleDefinitionMapper.insert(role);
+        } else {
+            existing.setRoleName(roleName.trim());
+            existing.setUpdatedAt(now);
+            roleDefinitionMapper.updateById(existing);
+        }
+    }
+
+    /** 删除角色定义并解除全部人员授权（分配关系随之失效）。 */
+    @Transactional
+    public int deleteRole(String roleCode) {
+        int removed = roleMapper.delete(new LambdaQueryWrapper<OrgUserRole>()
+                .eq(OrgUserRole::getRoleCode, roleCode));
+        roleDefinitionMapper.delete(new LambdaQueryWrapper<OrgRole>()
+                .eq(OrgRole::getRoleCode, roleCode));
+        return removed;
+    }
+
+    public record RoleDefinition(String roleCode, String roleName, int userCount) {
     }
 
     /** 过滤出状态为 ACTIVE 的人员（不存在或已停用的一律剔除），用于审批人解析。 */

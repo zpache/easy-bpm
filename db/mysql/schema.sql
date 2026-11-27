@@ -94,6 +94,17 @@ CREATE TABLE IF NOT EXISTS bpm_org_user_role (
     KEY idx_org_role (tenant_id, role_code)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '人员角色';
 
+CREATE TABLE IF NOT EXISTS bpm_org_role (
+    id         VARCHAR(32)  NOT NULL,
+    tenant_id  VARCHAR(32)  NOT NULL,
+    role_code  VARCHAR(64)  NOT NULL,
+    role_name  VARCHAR(64)  NOT NULL,
+    created_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_org_role (tenant_id, role_code)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '角色定义';
+
 CREATE TABLE IF NOT EXISTS bpm_flow_definition (
     id                    VARCHAR(32)  NOT NULL,
     tenant_id             VARCHAR(32)  NOT NULL,
