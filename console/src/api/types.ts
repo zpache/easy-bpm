@@ -72,6 +72,8 @@ export interface InstanceView {
   formData?: Record<string, unknown>
   status: 'RUNNING' | 'APPROVED' | 'REJECTED' | 'CANCELED'
   currentNodeName?: string
+  sourceAppKey?: string
+  sourceAppName?: string
   startedAt?: string
   endedAt?: string
 }

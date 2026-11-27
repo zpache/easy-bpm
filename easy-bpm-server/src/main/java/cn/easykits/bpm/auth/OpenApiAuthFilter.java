@@ -4,6 +4,7 @@ import cn.easykits.bpm.common.ApiResponse;
 import cn.easykits.bpm.common.BizException;
 import cn.easykits.bpm.common.ErrorCode;
 import cn.easykits.bpm.common.JsonCodec;
+import cn.easykits.bpm.tenant.AppContext;
 import cn.easykits.bpm.tenant.Tenant;
 import cn.easykits.bpm.tenant.TenantContext;
 import cn.easykits.bpm.tenant.TenantCredential;
@@ -72,11 +73,13 @@ public class OpenApiAuthFilter extends OncePerRequestFilter {
             verify(cachedRequest, credential);
 
             TenantContext.set(tenant.getId());
+            AppContext.set(credential.getAppKey(), credential.getName());
             tenantService.touchCredential(credential.getId());
             chain.doFilter(cachedRequest, response);
         } catch (BizException e) {
             writeError(response, e);
         } finally {
+            AppContext.clear();
             TenantContext.clear();
         }
     }

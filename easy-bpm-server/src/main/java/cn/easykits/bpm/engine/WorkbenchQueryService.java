@@ -65,7 +65,13 @@ public class WorkbenchQueryService {
     }
 
     public PageResult<TaskView> todo(String userId, int page, int size, String flowCode, String keyword) {
-        return todo(userId, page, size, flowCode, keyword, false);
+        return todo(userId, page, size, flowCode, keyword, false, null);
+    }
+
+    /** 接入方视角：可按来源 appKey 过滤；appKey 为空表示本租户全部。 */
+    public PageResult<TaskView> todo(String userId, int page, int size, String flowCode, String keyword,
+                                     String appKey) {
+        return todo(userId, page, size, flowCode, keyword, false, appKey);
     }
 
     /**
@@ -73,16 +79,19 @@ public class WorkbenchQueryService {
      * 与 OpenAPI 的个人待办共用同一查询与投影逻辑。
      */
     public PageResult<TaskView> todoByTenant(int page, int size, String flowCode, String keyword) {
-        return todo(null, page, size, flowCode, keyword, true);
+        return todo(null, page, size, flowCode, keyword, true, null);
     }
 
     /** allTenant=true 表示不限办理人（管理视角），否则只取 assignee 的任务。 */
     private PageResult<TaskView> todo(String userId, int page, int size, String flowCode, String keyword,
-                                      boolean allTenant) {
+                                      boolean allTenant, String appKey) {
         String tenantId = TenantContext.require();
         TaskQuery query = taskService.createTaskQuery().taskTenantId(tenantId);
         if (!allTenant && userId != null && !userId.isBlank()) {
             query.taskAssignee(userId);
+        }
+        if (appKey != null && !appKey.isBlank()) {
+            query.processVariableValueEquals(FlowEngineService.SOURCE_APP_KEY_VAR, appKey);
         }
         if (flowCode != null && !flowCode.isBlank()) {
             query.processDefinitionKey(compiler.processKeyOf(flowCode));
@@ -111,22 +120,31 @@ public class WorkbenchQueryService {
     }
 
     public PageResult<TaskView> done(String userId, int page, int size, String flowCode, String keyword) {
-        return done(userId, page, size, flowCode, keyword, false);
+        return done(userId, page, size, flowCode, keyword, false, null);
+    }
+
+    /** 接入方视角：可按来源 appKey 过滤；appKey 为空表示本租户全部。 */
+    public PageResult<TaskView> done(String userId, int page, int size, String flowCode, String keyword,
+                                     String appKey) {
+        return done(userId, page, size, flowCode, keyword, false, appKey);
     }
 
     /** 管理视角：本租户全部已办任务，不按办理人过滤，仅按租户隔离。 */
     public PageResult<TaskView> doneByTenant(int page, int size, String flowCode, String keyword) {
-        return done(null, page, size, flowCode, keyword, true);
+        return done(null, page, size, flowCode, keyword, true, null);
     }
 
     /** allTenant=true 表示不限办理人（管理视角），否则只取 assignee 的历史任务。 */
     private PageResult<TaskView> done(String userId, int page, int size, String flowCode, String keyword,
-                                      boolean allTenant) {
+                                      boolean allTenant, String appKey) {
         String tenantId = TenantContext.require();
         HistoricTaskInstanceQuery query = historyService.createHistoricTaskInstanceQuery()
                 .taskTenantId(tenantId).finished();
         if (!allTenant && userId != null && !userId.isBlank()) {
             query.taskAssignee(userId);
+        }
+        if (appKey != null && !appKey.isBlank()) {
+            query.processVariableValueEquals(FlowEngineService.SOURCE_APP_KEY_VAR, appKey);
         }
         if (flowCode != null && !flowCode.isBlank()) {
             query.processDefinitionKey(compiler.processKeyOf(flowCode));
@@ -184,8 +202,15 @@ public class WorkbenchQueryService {
 
     public PageResult<InstanceView> submitted(String userId, int page, int size, String flowCode,
                                               String status, String keyword) {
+        return submitted(userId, page, size, flowCode, status, keyword, null);
+    }
+
+    /** 接入方视角：可按来源 appKey 过滤（查询投影表 source_app_key 列）。 */
+    public PageResult<InstanceView> submitted(String userId, int page, int size, String flowCode,
+                                              String status, String keyword, String appKey) {
         LambdaQueryWrapper<BpmInstance> wrapper = new LambdaQueryWrapper<BpmInstance>()
                 .eq(BpmInstance::getInitiatorId, userId)
+                .eq(appKey != null && !appKey.isBlank(), BpmInstance::getSourceAppKey, appKey)
                 .eq(flowCode != null && !flowCode.isBlank(), BpmInstance::getFlowCode, flowCode)
                 .eq(status != null && !status.isBlank(), BpmInstance::getStatus, status)
                 .like(keyword != null && !keyword.isBlank(), BpmInstance::getTitle, keyword)
@@ -214,15 +239,38 @@ public class WorkbenchQueryService {
     }
 
     public WorkbenchCounts counts(String userId) {
+        return counts(userId, null);
+    }
+
+    /** 接入方视角：可按来源 appKey 过滤四类计数；appKey 为空表示本租户全部。 */
+    public WorkbenchCounts counts(String userId, String appKey) {
         String tenantId = TenantContext.require();
-        long todo = taskService.createTaskQuery().taskTenantId(tenantId).taskAssignee(userId).count();
-        long done = historyService.createHistoricTaskInstanceQuery()
-                .taskTenantId(tenantId).taskAssignee(userId).finished().count();
+        boolean byApp = appKey != null && !appKey.isBlank();
+        var todoQuery = taskService.createTaskQuery().taskTenantId(tenantId).taskAssignee(userId);
+        var doneQuery = historyService.createHistoricTaskInstanceQuery()
+                .taskTenantId(tenantId).taskAssignee(userId).finished();
+        if (byApp) {
+            todoQuery.processVariableValueEquals(FlowEngineService.SOURCE_APP_KEY_VAR, appKey);
+            doneQuery.processVariableValueEquals(FlowEngineService.SOURCE_APP_KEY_VAR, appKey);
+        }
+        long todo = todoQuery.count();
+        long done = doneQuery.count();
         long submitted = instanceMapper.selectCount(new LambdaQueryWrapper<BpmInstance>()
-                .eq(BpmInstance::getInitiatorId, userId));
-        long ccUnread = ccMapper.selectCount(new LambdaQueryWrapper<BpmCc>()
+                .eq(BpmInstance::getInitiatorId, userId)
+                .eq(byApp, BpmInstance::getSourceAppKey, appKey));
+        var ccWrapper = new LambdaQueryWrapper<BpmCc>()
                 .eq(BpmCc::getUserId, userId)
-                .eq(BpmCc::getReadFlag, 0));
+                .eq(BpmCc::getReadFlag, 0);
+        if (byApp) {
+            List<String> appInstanceIds = instanceMapper.selectList(new LambdaQueryWrapper<BpmInstance>()
+                            .eq(BpmInstance::getSourceAppKey, appKey))
+                    .stream().map(BpmInstance::getInstanceId).toList();
+            if (appInstanceIds.isEmpty()) {
+                return new WorkbenchCounts(todo, done, submitted, 0);
+            }
+            ccWrapper.in(BpmCc::getInstanceId, appInstanceIds);
+        }
+        long ccUnread = ccMapper.selectCount(ccWrapper);
         return new WorkbenchCounts(todo, done, submitted, ccUnread);
     }
 
@@ -242,27 +290,39 @@ public class WorkbenchQueryService {
      * 管理视角：本租户全部抄送记录，不按接收人过滤，仅按租户隔离。
      */
     public PageResult<CcView> ccByTenant(int page, int size, boolean unreadOnly, String keyword) {
-        return cc(null, page, size, unreadOnly, keyword, true);
+        return cc(null, page, size, unreadOnly, keyword, true, null);
     }
 
     /**
      * 抄送我的：按接收人分页查询，可按关键字（实例标题）与未读过滤。
      */
     public PageResult<CcView> cc(String userId, int page, int size, boolean unreadOnly, String keyword) {
-        return cc(userId, page, size, unreadOnly, keyword, false);
+        return cc(userId, page, size, unreadOnly, keyword, false, null);
+    }
+
+    /** 接入方视角：可按来源 appKey 过滤（关联实例投影表）。 */
+    public PageResult<CcView> cc(String userId, int page, int size, boolean unreadOnly, String keyword,
+                                 String appKey) {
+        return cc(userId, page, size, unreadOnly, keyword, false, appKey);
     }
 
     /** allTenant=true 表示不限接收人（管理视角），否则只取该接收人的抄送。 */
     private PageResult<CcView> cc(String userId, int page, int size, boolean unreadOnly, String keyword,
-                                  boolean allTenant) {
+                                  boolean allTenant, String appKey) {
         LambdaQueryWrapper<BpmCc> wrapper = new LambdaQueryWrapper<BpmCc>()
                 .eq(!allTenant && userId != null && !userId.isBlank(), BpmCc::getUserId, userId)
                 .eq(unreadOnly, BpmCc::getReadFlag, 0)
                 .orderByDesc(BpmCc::getCreatedAt);
-        if (keyword != null && !keyword.isBlank()) {
-            List<String> instanceIds = instanceMapper.selectList(new LambdaQueryWrapper<BpmInstance>()
-                            .like(BpmInstance::getTitle, keyword)
-                            .last("limit " + MAX_KEYWORD_HITS))
+        boolean byApp = appKey != null && !appKey.isBlank();
+        boolean byKeyword = keyword != null && !keyword.isBlank();
+        if (byApp || byKeyword) {
+            var instanceQuery = new LambdaQueryWrapper<BpmInstance>()
+                    .eq(byApp, BpmInstance::getSourceAppKey, appKey)
+                    .like(byKeyword, BpmInstance::getTitle, keyword);
+            if (byKeyword) {
+                instanceQuery.last("limit " + MAX_KEYWORD_HITS);
+            }
+            List<String> instanceIds = instanceMapper.selectList(instanceQuery)
                     .stream().map(BpmInstance::getInstanceId).toList();
             if (instanceIds.isEmpty()) {
                 return PageResult.empty(page, size);
@@ -371,9 +431,15 @@ public class WorkbenchQueryService {
      * 因此按 startedAt 倒序取最近一条，可用 flowCode 精确限定。
      */
     public InstanceView byBusinessKey(String businessKey, String flowCode) {
+        return byBusinessKey(businessKey, flowCode, null);
+    }
+
+    /** 接入方视角：可按来源 appKey 过滤，只反查本应用发起的实例。 */
+    public InstanceView byBusinessKey(String businessKey, String flowCode, String appKey) {
         BpmInstance row = instanceMapper.selectOne(new LambdaQueryWrapper<BpmInstance>()
                 .eq(BpmInstance::getBusinessKey, businessKey)
                 .eq(flowCode != null && !flowCode.isBlank(), BpmInstance::getFlowCode, flowCode)
+                .eq(appKey != null && !appKey.isBlank(), BpmInstance::getSourceAppKey, appKey)
                 .orderByDesc(BpmInstance::getStartedAt)
                 .last("limit 1"));
         if (row == null) {
@@ -402,6 +468,7 @@ public class WorkbenchQueryService {
                 instance.getFlowVersion(), instance.getBusinessKey(), instance.getTitle(),
                 instance.getInitiatorId(), instance.getInitiatorName(), instance.getInitiatorDeptCode(),
                 json.readMap(instance.getFormData()), instance.getStatus(), instance.getCurrentNodeName(),
+                instance.getSourceAppKey(), instance.getSourceAppName(),
                 instance.getStartedAt(), instance.getEndedAt());
     }
 

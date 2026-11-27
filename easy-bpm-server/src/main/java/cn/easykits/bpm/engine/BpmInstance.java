@@ -33,6 +33,10 @@ public class BpmInstance {
     private String currentNodeName;
     private String idempotencyKey;
     private String callbackUrl;
+    /** 来源接入方 appKey，发起时由服务端从鉴权上下文注入，不接受请求参数。 */
+    private String sourceAppKey;
+    /** 来源应用名称。 */
+    private String sourceAppName;
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
     private LocalDateTime updatedAt;

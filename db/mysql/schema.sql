@@ -162,6 +162,8 @@ CREATE TABLE IF NOT EXISTS bpm_instance (
     current_node_name  VARCHAR(128) NULL,
     idempotency_key    VARCHAR(191) NULL,
     callback_url       VARCHAR(512) NULL,
+    source_app_key     VARCHAR(64)  NULL COMMENT '来源接入方 appKey（服务端鉴权注入）',
+    source_app_name    VARCHAR(128) NULL COMMENT '来源应用名称',
     started_at         DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     ended_at           DATETIME(3)  NULL,
     updated_at         DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
@@ -170,6 +172,7 @@ CREATE TABLE IF NOT EXISTS bpm_instance (
     UNIQUE KEY uk_instance_idem (tenant_id, idempotency_key),
     KEY idx_instance_engine (tenant_id, engine_instance_id),
     KEY idx_instance_initiator (tenant_id, initiator_id, started_at),
+    KEY idx_instance_source (tenant_id, source_app_key, started_at),
     KEY idx_instance_status (tenant_id, status, started_at),
     KEY idx_instance_business (tenant_id, business_key),
     KEY idx_instance_flow (tenant_id, flow_code, started_at)

@@ -104,8 +104,9 @@ public class OpenApiController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String flowCode,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String keyword) {
-        return ApiResponse.ok(query.submitted(userId, page(page), size(size), flowCode, status, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String appKey) {
+        return ApiResponse.ok(query.submitted(userId, page(page), size(size), flowCode, status, keyword, appKey));
     }
 
     @GetMapping("/tasks/todo")
@@ -115,8 +116,9 @@ public class OpenApiController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String flowCode,
-            @RequestParam(required = false) String keyword) {
-        return ApiResponse.ok(query.todo(userId, page(page), size(size), flowCode, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String appKey) {
+        return ApiResponse.ok(query.todo(userId, page(page), size(size), flowCode, keyword, appKey));
     }
 
     @GetMapping("/tasks/done")
@@ -126,14 +128,16 @@ public class OpenApiController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String flowCode,
-            @RequestParam(required = false) String keyword) {
-        return ApiResponse.ok(query.done(userId, page(page), size(size), flowCode, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String appKey) {
+        return ApiResponse.ok(query.done(userId, page(page), size(size), flowCode, keyword, appKey));
     }
 
     @GetMapping("/tasks/count")
     @Operation(summary = "查询待办/已办/已提交数量")
-    public ApiResponse<WorkbenchCounts> counts(@RequestParam String userId) {
-        return ApiResponse.ok(query.counts(userId));
+    public ApiResponse<WorkbenchCounts> counts(@RequestParam String userId,
+                                               @RequestParam(required = false) String appKey) {
+        return ApiResponse.ok(query.counts(userId, appKey));
     }
 
     @GetMapping("/workbench")
@@ -142,11 +146,14 @@ public class OpenApiController {
     public ApiResponse<WorkbenchSnapshot> workbench(
             @RequestParam String userId,
             @RequestParam(defaultValue = "20") int todoSize,
-            @RequestParam(defaultValue = "10") int ccSize) {
-        WorkbenchCounts counts = query.counts(userId);
+            @RequestParam(defaultValue = "10") int ccSize,
+            @RequestParam(required = false) String appKey) {
+        WorkbenchCounts counts = query.counts(userId, appKey);
         // todoSize / ccSize 传 0 表示只要角标，不取列表
-        List<TaskView> todo = todoSize <= 0 ? List.of() : query.todo(userId, 1, size(todoSize), null, null).list();
-        List<CcView> ccUnread = ccSize <= 0 ? List.of() : query.cc(userId, 1, size(ccSize), true, null).list();
+        List<TaskView> todo = todoSize <= 0 ? List.of()
+                : query.todo(userId, 1, size(todoSize), null, null, appKey).list();
+        List<CcView> ccUnread = ccSize <= 0 ? List.of()
+                : query.cc(userId, 1, size(ccSize), true, null, appKey).list();
         LocalDateTime now = LocalDateTime.now();
         return ApiResponse.ok(new WorkbenchSnapshot(counts, todo, ccUnread,
                 now.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), now));
@@ -159,16 +166,18 @@ public class OpenApiController {
     public ApiResponse<ChangeFeed> changes(
             @RequestParam String userId,
             @RequestParam(required = false) Long cursor,
-            @RequestParam(required = false) Integer limit) {
-        return ApiResponse.ok(changeFeed.feed(userId, cursor, limit));
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) String appKey) {
+        return ApiResponse.ok(changeFeed.feed(userId, cursor, limit, appKey));
     }
 
     @GetMapping("/instances/by-business-key")
     @Operation(summary = "按业务主键反查审批",
             description = "接入方用自己的单号（businessKey）查状态，无需落地 instanceId；跨流程重复时取最近一条")
     public ApiResponse<InstanceView> byBusinessKey(@RequestParam String businessKey,
-                                                   @RequestParam(required = false) String flowCode) {
-        return ApiResponse.ok(query.byBusinessKey(businessKey, flowCode));
+                                                   @RequestParam(required = false) String flowCode,
+                                                   @RequestParam(required = false) String appKey) {
+        return ApiResponse.ok(query.byBusinessKey(businessKey, flowCode, appKey));
     }
 
     @GetMapping("/cc")
@@ -178,8 +187,9 @@ public class OpenApiController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "false") boolean unreadOnly,
-            @RequestParam(required = false) String keyword) {
-        return ApiResponse.ok(query.cc(userId, page(page), size(size), unreadOnly, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String appKey) {
+        return ApiResponse.ok(query.cc(userId, page(page), size(size), unreadOnly, keyword, appKey));
     }
 
     @PostMapping("/cc/{id}/read")

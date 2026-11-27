@@ -69,6 +69,11 @@ public class ChangeFeedService {
      * @param limit  本页最多事件数
      */
     public ChangeFeed feed(String userId, Long cursor, Integer limit) {
+        return feed(userId, cursor, limit, null);
+    }
+
+    /** 接入方视角：可按来源 appKey 过滤四类事件；appKey 为空表示本租户全部。 */
+    public ChangeFeed feed(String userId, Long cursor, Integer limit, String appKey) {
         String tenantId = TenantContext.require();
         if (userId == null || userId.isBlank()) {
             throw BizException.badRequest("userId 不能为空");
@@ -85,10 +90,10 @@ public class ChangeFeedService {
         LocalDateTime sinceLocal = LocalDateTime.ofInstant(since.toInstant(), ZoneId.systemDefault());
 
         List<ChangeEvent> events = new ArrayList<>();
-        events.addAll(taskCreatedEvents(tenantId, userId, since, size + 1, serverTime));
-        events.addAll(taskCompletedEvents(tenantId, userId, since, size + 1, serverTime));
-        events.addAll(ccEvents(userId, sinceLocal, size + 1));
-        events.addAll(instanceEvents(userId, sinceLocal, size + 1));
+        events.addAll(taskCreatedEvents(tenantId, userId, since, size + 1, serverTime, appKey));
+        events.addAll(taskCompletedEvents(tenantId, userId, since, size + 1, serverTime, appKey));
+        events.addAll(ccEvents(userId, sinceLocal, size + 1, appKey));
+        events.addAll(instanceEvents(userId, sinceLocal, size + 1, appKey));
 
         List<ChangeEvent> merged = dedupeAndSort(events);
         boolean hasMore = merged.size() > size;
@@ -107,26 +112,34 @@ public class ChangeFeedService {
     }
 
     private List<ChangeEvent> taskCreatedEvents(String tenantId, String userId, Date since, int fetch,
-                                                LocalDateTime serverTime) {
-        List<HistoricTaskInstance> tasks = historyService.createHistoricTaskInstanceQuery()
+                                                LocalDateTime serverTime, String appKey) {
+        var query = historyService.createHistoricTaskInstanceQuery()
                 .taskTenantId(tenantId)
                 .taskAssignee(userId)
-                .taskCreatedAfter(since)
-                .orderByTaskCreateTime().asc()
-                .listPage(0, fetch);
+                .taskCreatedAfter(since);
+        if (isApp(appKey)) {
+            query.processVariableValueEquals(FlowEngineService.SOURCE_APP_KEY_VAR, appKey);
+        }
+        List<HistoricTaskInstance> tasks = query.orderByTaskCreateTime().asc().listPage(0, fetch);
         return taskEvents(tasks, "TASK_CREATED", true, serverTime);
     }
 
     private List<ChangeEvent> taskCompletedEvents(String tenantId, String userId, Date since, int fetch,
-                                                  LocalDateTime serverTime) {
-        List<HistoricTaskInstance> tasks = historyService.createHistoricTaskInstanceQuery()
+                                                  LocalDateTime serverTime, String appKey) {
+        var query = historyService.createHistoricTaskInstanceQuery()
                 .taskTenantId(tenantId)
                 .taskAssignee(userId)
                 .finished()
-                .taskCompletedAfter(since)
-                .orderByHistoricTaskInstanceEndTime().asc()
-                .listPage(0, fetch);
+                .taskCompletedAfter(since);
+        if (isApp(appKey)) {
+            query.processVariableValueEquals(FlowEngineService.SOURCE_APP_KEY_VAR, appKey);
+        }
+        List<HistoricTaskInstance> tasks = query.orderByHistoricTaskInstanceEndTime().asc().listPage(0, fetch);
         return taskEvents(tasks, "TASK_COMPLETED", false, serverTime);
+    }
+
+    private boolean isApp(String appKey) {
+        return appKey != null && !appKey.isBlank();
     }
 
     private List<ChangeEvent> taskEvents(List<HistoricTaskInstance> tasks, String type, boolean created,
@@ -173,12 +186,21 @@ public class ChangeFeedService {
         return result;
     }
 
-    private List<ChangeEvent> ccEvents(String userId, LocalDateTime since, int fetch) {
-        List<BpmCc> rows = ccMapper.selectList(new LambdaQueryWrapper<BpmCc>()
+    private List<ChangeEvent> ccEvents(String userId, LocalDateTime since, int fetch, String appKey) {
+        var wrapper = new LambdaQueryWrapper<BpmCc>()
                 .eq(BpmCc::getUserId, userId)
                 .gt(BpmCc::getCreatedAt, since)
-                .orderByAsc(BpmCc::getCreatedAt)
-                .last("limit " + fetch));
+                .orderByAsc(BpmCc::getCreatedAt);
+        if (isApp(appKey)) {
+            List<String> appInstanceIds = instanceMapper.selectList(new LambdaQueryWrapper<BpmInstance>()
+                            .eq(BpmInstance::getSourceAppKey, appKey))
+                    .stream().map(BpmInstance::getInstanceId).toList();
+            if (appInstanceIds.isEmpty()) {
+                return List.of();
+            }
+            wrapper.in(BpmCc::getInstanceId, appInstanceIds);
+        }
+        List<BpmCc> rows = ccMapper.selectList(wrapper.last("limit " + fetch));
         if (rows.isEmpty()) {
             return List.of();
         }
@@ -204,9 +226,10 @@ public class ChangeFeedService {
         }).toList();
     }
 
-    private List<ChangeEvent> instanceEvents(String userId, LocalDateTime since, int fetch) {
+    private List<ChangeEvent> instanceEvents(String userId, LocalDateTime since, int fetch, String appKey) {
         List<BpmInstance> rows = instanceMapper.selectList(new LambdaQueryWrapper<BpmInstance>()
                 .eq(BpmInstance::getInitiatorId, userId)
+                .eq(isApp(appKey), BpmInstance::getSourceAppKey, appKey)
                 .gt(BpmInstance::getUpdatedAt, since)
                 .orderByAsc(BpmInstance::getUpdatedAt)
                 .last("limit " + fetch));

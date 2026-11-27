@@ -15,6 +15,8 @@ public record InstanceView(
         Object formData,
         String status,
         String currentNodeName,
+        String sourceAppKey,
+        String sourceAppName,
         LocalDateTime startedAt,
         LocalDateTime endedAt
 ) {

@@ -17,6 +17,7 @@ import cn.easykits.bpm.flow.NodeType;
 import cn.easykits.bpm.flow.RejectStrategy;
 import cn.easykits.bpm.org.OrgService;
 import cn.easykits.bpm.org.OrgUser;
+import cn.easykits.bpm.tenant.AppContext;
 import cn.easykits.bpm.tenant.TenantContext;
 import cn.easykits.bpm.tenant.Tenant;
 import cn.easykits.bpm.tenant.TenantMapper;
@@ -57,6 +58,9 @@ public class FlowEngineService {
 
     /** TO_START 驳回后实例停留在等待重提状态的展示名。 */
     public static final String PENDING_RESUBMIT_NODE = "等待发起人重新提交";
+
+    /** 流程变量：来源接入方 appKey，供待办/已办按应用过滤。 */
+    public static final String SOURCE_APP_KEY_VAR = "__source_app_key";
 
     private final FlowDefinitionService definitions;
     private final BpmnCompiler compiler;
@@ -129,6 +133,12 @@ public class FlowEngineService {
 
         ResolvedFlow resolved = resolveVariables(definition, schema, command, title);
         Map<String, Object> variables = resolved.variables();
+        // 来源应用由服务端从鉴权上下文注入，写入流程变量供待办/已办按应用过滤
+        String sourceAppKey = AppContext.getAppKey();
+        String sourceAppName = AppContext.getAppName();
+        if (sourceAppKey != null && !sourceAppKey.isBlank()) {
+            variables.put(SOURCE_APP_KEY_VAR, sourceAppKey);
+        }
 
         ProcessInstance processInstance;
         try {
@@ -156,6 +166,8 @@ public class FlowEngineService {
         projection.setStatus(InstanceStatus.RUNNING.name());
         projection.setIdempotencyKey(blankToNull(command.idempotencyKey()));
         projection.setCallbackUrl(command.callbackUrl());
+        projection.setSourceAppKey(sourceAppKey);
+        projection.setSourceAppName(sourceAppName);
         projection.setStartedAt(now);
         projection.setUpdatedAt(now);
         instanceMapper.insert(projection);
@@ -202,6 +214,10 @@ public class FlowEngineService {
         Map<String, Object> variables = resolved.variables();
         // 重提会更换引擎实例 ID，抄送节点需据此回写对外 ID
         variables.put(CcDelegate.INSTANCE_ID_VAR, projection.getInstanceId());
+        // 来源应用继承原实例，不受重提调用方影响（避免跨应用串改来源）
+        if (projection.getSourceAppKey() != null && !projection.getSourceAppKey().isBlank()) {
+            variables.put(SOURCE_APP_KEY_VAR, projection.getSourceAppKey());
+        }
 
         ProcessInstance newProcess;
         try {
